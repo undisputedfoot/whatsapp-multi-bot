@@ -5,7 +5,7 @@ Toggle per session — replaces keyword auto-reply with natural conversations.
 
 import re
 import json
-from ..config import AI_PROVIDER, AI_API_KEY, AI_MODEL, AI_SYSTEM_PROMPT, GROQ_API_KEY, GROQ_MODEL, GOOGLE_API_KEY, GEMINI_MODEL
+from ..config import AI_PROVIDER, AI_API_KEY, AI_MODEL, AI_SYSTEM_PROMPT, GROQ_API_KEY, GROQ_MODEL, GOOGLE_API_KEY, GEMINI_MODEL, NVIDIA_API_KEY, NVIDIA_MODEL
 
 
 class AIReply:
@@ -21,6 +21,10 @@ class AIReply:
 
         if provider == "groq":
             api_key = GROQ_API_KEY
+            if not api_key:
+                return False
+        elif provider == "nvidia":
+            api_key = NVIDIA_API_KEY
             if not api_key:
                 return False
 
@@ -41,8 +45,8 @@ class AIReply:
             elif provider == "groq":
                 reply = await self._groq_chat(sender)
             elif provider == "gemini":
-                reply = await self._gemini_chat(sender)
-            else:
+                reply = await self._gemini_chat(sender)            elif provider == "nvidia":
+                reply = await self._nvidia_chat(sender)            else:
                 return False
 
             if reply:
@@ -106,6 +110,30 @@ class AIReply:
                 },
                 json={
                     "model": GROQ_MODEL,
+                    "messages": messages,
+                    "max_tokens": 500,
+                    "temperature": 0.7,
+                },
+            )
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+
+    async def _nvidia_chat(self, sender: str) -> str | None:
+        """Call NVIDIA API (OpenAI-compatible)."""
+        import httpx
+
+        messages = [{"role": "system", "content": AI_SYSTEM_PROMPT}]
+        messages.extend(self._history[sender])
+
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.post(
+                "https://integrate.api.nvidia.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {NVIDIA_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": NVIDIA_MODEL,
                     "messages": messages,
                     "max_tokens": 500,
                     "temperature": 0.7,
