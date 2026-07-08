@@ -18,6 +18,14 @@ from flask import (
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 
+# Shared reference to the bot's asyncio event loop (set by main.py)
+class _BotLoop:
+    _loop = None
+    def set(self, loop): self._loop = loop
+    def get(self): return self._loop
+
+bot_loop = _BotLoop()
+
 from pathlib import Path
 import core.config
 
@@ -137,14 +145,15 @@ def api_qr(name):
     sess = manager.get_session(name)
     if not sess or not sess.wapp:
         return jsonify({"qr": None})
-    loop = asyncio.new_event_loop()
+    loop = bot_loop.get()
+    if not loop:
+        return jsonify({"qr": None})
     try:
-        qr = loop.run_until_complete(sess.wapp.get_qr_data())
+        future = asyncio.run_coroutine_threadsafe(sess.wapp.get_qr_data(), loop)
+        qr = future.result(timeout=10)
         return jsonify({"qr": qr})
     except Exception:
         return jsonify({"qr": None})
-    finally:
-        loop.close()
 
 
 # ── API: Session Actions ─────────────────────────────

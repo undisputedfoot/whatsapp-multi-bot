@@ -76,7 +76,7 @@ def _first_run_wizard():
 from core.config import BASE_DIR
 from core.manager import manager
 from core.lang import t
-from web.app import app, run as run_web
+from web.app import app, run as run_web, bot_loop
 from core import db
 
 
@@ -84,6 +84,7 @@ def start_bot():
     """Run the WhatsApp bot in a background event loop."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    bot_loop.set(loop)
     db.migrate()
 
     print("=" * 50)

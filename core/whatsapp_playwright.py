@@ -20,43 +20,100 @@ window.__WA_READY = false;
 window.__WA_GROUP_EVENTS = [];
 
 (function findStore() {
-    const webpack = window.webpackChunkwhatsapp_web_client;
-    if (!webpack) { setTimeout(findStore, 1000); return; }
+    var wp = window.webpackChunkwhatsapp_web_client || window.webpackChunkwhatsapp;
+    if (!wp) { setTimeout(findStore, 2000); return; }
     try {
-        const scan = (obj, depth=0) => {
-            if (depth > 5 || !obj || typeof obj !== 'object') return;
-            if (obj.Chat && obj.Msg && obj.Contact) { window.__WA_STORE = obj; return; }
-            if (Array.isArray(obj)) { obj.forEach(i => scan(i, depth+1)); return; }
-            Object.values(obj).forEach(v => scan(v, depth+1));
-        };
-        Object.values(webpack.c || {}).forEach(m => { if (m && m.exports) scan(m.exports); });
+        for (var key in wp.c) {
+            var m = wp.c[key];
+            if (!m || m.__scanned) continue;
+            m.__scanned = true;
+            (function scan(obj, depth) {
+                if (depth > 8 || !obj || typeof obj !== 'object') return;
+                try {
+                    // Look for any object with common WhatsApp store methods
+                    var keys = Object.keys(obj);
+                    if (keys.length > 3 && keys.length < 30) {
+                        // Check if it has model-like properties
+                        var hasModel = false, hasEvents = false;
+                        for (var k of keys) {
+                            if (k === 'models' || k === 'Model') hasModel = true;
+                            if (k === 'on' || k === 'emit') hasEvents = true;
+                        }
+                        // More specific: look for collections with models that have Chat/Msg
+                        if (obj.models && typeof obj.models === 'object') {
+                            var modelKeys = Object.keys(obj.models);
+                            if (modelKeys.length >= 3) {
+                                window.__WA_STORE = obj;
+                                window.__WA_STORE_FOUND = true;
+                                return;
+                            }
+                        }
+                    }
+                    if (Array.isArray(obj)) { obj.forEach(function(i) { scan(i, depth+1); }); return; }
+                    for (var k in obj) { try { scan(obj[k], depth+1); } catch(e) {} }
+                } catch(e) {}
+            })(m.exports, 0);
+            if (window.__WA_STORE) break;
+        }
     } catch(e) {}
     if (!window.__WA_STORE) {
-        for (const key of ['Store', 'store', 'WAMyStore', 'WapStore']) {
-            if (window[key] && window[key].Chat) { window.__WA_STORE = window[key]; break; }
+        for (var key of ['Store', 'store', 'WAMyStore', 'WapStore', 'WPP', 'WWebJS']) {
+            try {
+                var s = window[key];
+                if (s && typeof s === 'object' && Object.keys(s).length > 5) {
+                    // Check if this could be the store
+                    for (var k in s) {
+                        if (s[k] && typeof s[k] === 'object' && s[k].models) {
+                            window.__WA_STORE = s;
+                            window.__WA_STORE_FOUND = true;
+                            break;
+                        }
+                    }
+                    if (window.__WA_STORE) break;
+                }
+            } catch(e) {}
         }
     }
     if (window.__WA_STORE) {
         try {
-            window.__WA_STORE.Msg.on('add', (msg) => {
-                if (!msg.fromMe && msg.body) {
-                    window.__WA_MSGS.push({
-                        id: msg.id?._serialized || '', from: msg.from?.user || '',
-                        body: msg.body, type: msg.type || 'chat',
-                        timestamp: msg.t || Math.floor(Date.now()/1000),
-                        chatId: msg.id?.remote || '',
-                        isGroup: (msg.id?.remote || '').includes('-') || false,
-                    });
+            var store = window.__WA_STORE;
+            // Try to find the Msg collection
+            var msgCollection = null;
+            for (var k in store) {
+                if (store[k] && typeof store[k] === 'object' && typeof store[k].on === 'function') {
+                    // Check if this looks like a message collection
+                    var sk = Object.keys(store[k]);
+                    if (sk.indexOf('add') >= 0 || sk.indexOf('models') >= 0) {
+                        msgCollection = store[k];
+                        break;
+                    }
                 }
-            });
-        } catch(e) {}
-        try {
-            window.__WA_STORE.Call.on('add', (call) => {
-                window.__WA_CALLS.push({
-                    id: call.id || '', from: call.from?.user || '',
-                    status: call.status || '', isVideo: call.isVideo || false,
+            }
+            if (!msgCollection) {
+                // Try common names
+                for (var name of ['Msg', 'msg', 'Message', 'message', 'Chat', 'chat']) {
+                    if (store[name] && typeof store[name].on === 'function') {
+                        msgCollection = store[name];
+                        break;
+                    }
+                }
+            }
+            if (msgCollection && typeof msgCollection.on === 'function') {
+                msgCollection.on('add', function(msg) {
+                    try {
+                        var body = msg.body || msg.bodyText || '';
+                        var from = msg.from ? (msg.from.user || msg.from._serialized || '') : '';
+                        var chatId = msg.id ? (msg.id.remote || '') : '';
+                        if (!msg.fromMe && body) {
+                            window.__WA_MSGS.push({
+                                id: msg.id?._serialized || msg.id || '',
+                                from: from, body: body,
+                                chatId: chatId || from,
+                            });
+                        }
+                    } catch(e) {}
                 });
-            });
+            }
         } catch(e) {}
         window.__WA_READY = true;
     } else {
@@ -91,14 +148,37 @@ class WApp:
     async def start(self):
         p = await async_playwright().start()
         
-        # Find Chromium binary: try system path first, fall back to Playwright's bundled
-        import shutil, os
-        chrome_path = os.environ.get("CHROMIUM_PATH") or shutil.which("chromium") or shutil.which("chromium-browser")
+        # Find Chromium binary: env var, system PATH, Playwright bundle, common locations
+        import shutil, os, glob
+        chrome_path = os.environ.get("CHROMIUM_PATH")
+        if not chrome_path:
+            chrome_path = shutil.which("chromium") or shutil.which("chromium-browser")
+        if not chrome_path:
+            # Look for Playwright's bundled Chromium
+            playwright_dirs = [
+                os.path.expanduser("~\\AppData\\Local\\ms-playwright"),
+                os.path.expanduser("~/.cache/ms-playwright"),
+            ]
+            for d in playwright_dirs:
+                if os.path.isdir(d):
+                    matches = sorted(glob.glob(os.path.join(d, "chromium-*", "chrome-win64", "chrome.exe")))
+                    if matches:
+                        chrome_path = matches[-1]
+                        break
+                    matches = sorted(glob.glob(os.path.join(d, "chromium-*", "chrome-linux", "chrome")))
+                    if matches:
+                        chrome_path = matches[-1]
+                        break
         launch_opts = dict(
             user_data_dir=str(SESSION_DIR / self.name),
-            headless=True, viewport={"width": 800, "height": 600}, locale="en-US",
+            headless=True, viewport={"width": 1280, "height": 720}, locale="en-US",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
-                  "--disable-gpu", "--no-first-run"],
+                  "--disable-gpu", "--no-first-run",
+                  "--disable-blink-features=AutomationControlled",
+                  "--disable-session-crashed-bubble", "--disable-infobars",
+                  "--disable-background-timer-throttling",
+                  "--disable-renderer-backgrounding"],
         )
         if chrome_path:
             launch_opts["executable_path"] = chrome_path
@@ -108,11 +188,23 @@ class WApp:
         
         self._context = await p.chromium.launch_persistent_context(**launch_opts)
         self.page = self._context.pages[0] if self._context.pages else await self._context.new_page()
+
+        # Stealth: set up automation evasion before page loads
+        await self.page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            window.chrome = { runtime: {} };
+            Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        """)
+
         await self.page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
+
+        # Simple store injection (will retry via setTimeout in the JS)
         await self.page.evaluate(STORE_INJECT_JS)
         asyncio.create_task(self._auth_loop())
         asyncio.create_task(self._message_poll())
         asyncio.create_task(self._call_poll())
+        asyncio.create_task(self._watchdog())
         return self
 
     async def stop(self):
@@ -122,14 +214,65 @@ class WApp:
         except Exception:
             pass
 
+    async def _dismiss_overlays(self, page):
+        """Dismiss any WhatsApp overlays/modals blocking the UI."""
+        try:
+            # Click close buttons on common overlays
+            for sel in [
+                "div[data-testid='x']", "button[aria-label='Close']",
+                "div[role='button'][aria-label='Close']", "span[data-icon='x']",
+                "div[data-testid='drawer-close-button']",
+            ]:
+                btn = page.locator(sel).first
+                if await btn.is_visible(timeout=500):
+                    await btn.click()
+                    await asyncio.sleep(0.5)
+                    return True
+            # Try clicking any canvas that might be an overlay
+            overlay = page.locator("div[data-testid='popup-container']")
+            if await overlay.is_visible(timeout=500):
+                close_btn = overlay.locator("div[role='button'], button").first
+                if await close_btn.is_visible(timeout=500):
+                    await close_btn.click()
+                    await asyncio.sleep(0.5)
+                    return True
+        except Exception:
+            pass
+        return False
+
     async def _auth_loop(self):
         page = self.page
         retries = 0
         while not self._stop:
             try:
-                # Check if already logged in
-                try:
-                    await page.wait_for_selector("div[data-testid='chat-list']", timeout=5)
+                # Check if already logged in (multiple selectors for different WA versions)
+                logged_in = False
+                for sel in [
+                    "div[data-testid='chat-list']",
+                    "div[data-testid='conversation-list']",
+                    "div[role='application'] div[role='row']",
+                    "div[aria-label='Chat list']",
+                    "header[data-testid='chat-list-header']",
+                    "div[data-testid='list-container']",
+                ]:
+                    try:
+                        if await page.locator(sel).first.is_visible(timeout=1000):
+                            logged_in = True
+                            break
+                    except Exception:
+                        continue
+                # Also check body text for chat indicators
+                if not logged_in:
+                    try:
+                        body = await page.evaluate("document.body?.innerText?.substring(0, 500) || ''")
+                        # If we see chat contacts and no QR-related text, we're logged in
+                        if any(m in body for m in ["Updates in Status", "Favourites", "Groups", "Communities"]) and \
+                           "Scan" not in body and "QR" not in body:
+                            logged_in = True
+                    except Exception:
+                        pass
+
+                if logged_in:
                     if not self.connected:
                         self.connected = True
                         print("  ✅ WhatsApp Web authenticated!")
@@ -137,7 +280,18 @@ class WApp:
                         if self._on_ready: await self._safe_call(self._on_ready)
                     await asyncio.sleep(5)
                     continue
-                except TimeoutError:
+                else:
+                    # Try dismissing overlays that might block the UI
+                    dismissed = await self._dismiss_overlays(page)
+                    if dismissed:
+                        await asyncio.sleep(2)
+                        continue
+
+                    # If we were connected but UI disappeared → disconnected
+                    if self.connected:
+                        self.connected = False
+                        self._qr_sent = False
+                        print("  🔴 WhatsApp disconnected! Looking for QR again...")
                     pass
 
                 # Log page state for debugging (every 15 seconds)
@@ -191,18 +345,74 @@ class WApp:
             await asyncio.sleep(2)
 
     async def _message_poll(self):
+        """Poll for new messages via Store hook and DOM fallback."""
+        last_state = ""
+        diag_count = 0
         while not self._stop:
             if self.connected and self.page:
                 try:
-                    count = await self.page.evaluate("window.__WA_MSGS.length")
-                    while self._last_msg_count < count:
-                        msg = await self.page.evaluate(f"window.__WA_MSGS[{self._last_msg_count}]")
-                        self._last_msg_count += 1
-                        if msg and msg.get("body") and self._on_msg:
-                            await self._safe_call(self._on_msg, msg)
+                    # Method 1: Store hook (if found)
+                    store_ready = await self.page.evaluate("window.__WA_READY || false")
+                    if store_ready:
+                        count = await self.page.evaluate("(window.__WA_MSGS || []).length")
+                        while self._last_msg_count < count:
+                            msg = await self.page.evaluate(f"window.__WA_MSGS[{self._last_msg_count}]")
+                            self._last_msg_count += 1
+                            if msg and msg.get("body") and self._on_msg:
+                                print(f"  📩 {msg.get('from','')}: {msg.get('body','')[:60]}")
+                                await self._safe_call(self._on_msg, msg)
+                        await asyncio.sleep(1.5)
+                        continue
+
+                    # Log store search status periodically
+                    diag_count += 1
+                    if diag_count % 15 == 0:
+                        status = await self.page.evaluate("""
+                            (() => {
+                                const wp = window.webpackChunkwhatsapp_web_client;
+                                return {ready:!!window.__WA_READY, wp:!!wp, modules: wp ? Object.keys(wp.c||{}).length : 0};
+                            })()
+                        """)
+                        if not status.get('ready'):
+                            print(f"  ⏳ Store search: WP={status.get('wp')}, modules={status.get('modules')}")
+
+                    # Method 2: DOM fallback - read unread chats
+                    chats = await self.page.evaluate("""
+                        (() => {
+                            const items = document.querySelectorAll('div[role="row"]');
+                            const results = [];
+                            for (const el of items) {
+                                const badge = el.querySelector('[aria-label*="unread"]');
+                                if (!badge) continue;
+                                const spans = el.querySelectorAll('span[dir="auto"]');
+                                if (spans.length < 2) continue;
+                                const name = spans[0]?.textContent?.trim() || '';
+                                const preview = spans[spans.length-1]?.textContent?.trim() || '';
+                                const link = el.querySelector('a[href*="phone"]');
+                                const phone = link ? link.getAttribute('href')?.match(/phone=([^&]+)/)?.[1] || '' : '';
+                                results.push({name, preview, phone, badge: badge.textContent});
+                            }
+                            return results.slice(0, 5);
+                        })()
+                    """)
+
+                    if chats:
+                        state = str([(c['name'], c['badge']) for c in chats])
+                        if state != last_state:
+                            last_state = state
+                            for c in chats:
+                                if c['preview'].startswith('!') and self._on_msg:
+                                    phone = c['phone'] or c['name']
+                                    print(f"  📩 DOM Cmd: {c['name']} - {c['preview'][:60]}")
+                                    await self._safe_call(self._on_msg, {
+                                        "body": c['preview'],
+                                        "from": phone,
+                                        "id": f"dom_{abs(hash(c['preview']))}",
+                                        "chatId": phone,
+                                    })
                 except Exception:
                     pass
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(2)
 
     async def _call_poll(self):
         while not self._stop:
@@ -303,6 +513,25 @@ class WApp:
         except Exception:
             pass
         return chats
+
+    async def _watchdog(self):
+        """Monitor page health and reconnect if needed."""
+        while not self._stop:
+            await asyncio.sleep(30)
+            try:
+                if not self.page or self.page.is_closed():
+                    print("  ⚠️  Page closed, attempting reconnect...")
+                    self.connected = False
+                    break
+                # Check if page is responsive
+                title = await self.page.title()
+                if not title:
+                    print("  ⚠️  Page unresponsive, marking disconnected...")
+                    self.connected = False
+            except Exception:
+                if self.connected:
+                    print("  ⚠️  Page error, marking disconnected...")
+                    self.connected = False
 
     @staticmethod
     async def _safe_call(fn, *args):

@@ -45,8 +45,10 @@ class AIReply:
             elif provider == "groq":
                 reply = await self._groq_chat(sender)
             elif provider == "gemini":
-                reply = await self._gemini_chat(sender)            elif provider == "nvidia":
-                reply = await self._nvidia_chat(sender)            else:
+                reply = await self._gemini_chat(sender)
+            elif provider == "nvidia":
+                reply = await self._nvidia_chat(sender)
+            else:
                 return False
 
             if reply:
