@@ -345,73 +345,108 @@ class WApp:
             await asyncio.sleep(2)
 
     async def _message_poll(self):
-        """Poll for new messages via Store hook and DOM fallback."""
-        last_state = ""
-        diag_count = 0
+        """Poll for new messages by reading the WhatsApp chat list DOM."""
+        last_unread = ""
+        diag = 0
         while not self._stop:
             if self.connected and self.page:
                 try:
-                    # Method 1: Store hook (if found)
-                    store_ready = await self.page.evaluate("window.__WA_READY || false")
-                    if store_ready:
-                        count = await self.page.evaluate("(window.__WA_MSGS || []).length")
-                        while self._last_msg_count < count:
-                            msg = await self.page.evaluate(f"window.__WA_MSGS[{self._last_msg_count}]")
-                            self._last_msg_count += 1
-                            if msg and msg.get("body") and self._on_msg:
-                                print(f"  📩 {msg.get('from','')}: {msg.get('body','')[:60]}")
-                                await self._safe_call(self._on_msg, msg)
-                        await asyncio.sleep(1.5)
-                        continue
-
-                    # Log store search status periodically
-                    diag_count += 1
-                    if diag_count % 15 == 0:
-                        status = await self.page.evaluate("""
-                            (() => {
-                                const wp = window.webpackChunkwhatsapp_web_client;
-                                return {ready:!!window.__WA_READY, wp:!!wp, modules: wp ? Object.keys(wp.c||{}).length : 0};
-                            })()
-                        """)
-                        if not status.get('ready'):
-                            print(f"  ⏳ Store search: WP={status.get('wp')}, modules={status.get('modules')}")
-
-                    # Method 2: DOM fallback - read unread chats
-                    chats = await self.page.evaluate("""
+                    # Read unread chat entries from the DOM
+                    unread = await self.page.evaluate("""
                         (() => {
                             const items = document.querySelectorAll('div[role="row"]');
                             const results = [];
                             for (const el of items) {
-                                const badge = el.querySelector('[aria-label*="unread"]');
+                                const badge = el.querySelector('[data-testid="icon-unread-count"], [aria-label*="unread"]');
                                 if (!badge) continue;
-                                const spans = el.querySelectorAll('span[dir="auto"]');
-                                if (spans.length < 2) continue;
-                                const name = spans[0]?.textContent?.trim() || '';
-                                const preview = spans[spans.length-1]?.textContent?.trim() || '';
-                                const link = el.querySelector('a[href*="phone"]');
-                                const phone = link ? link.getAttribute('href')?.match(/phone=([^&]+)/)?.[1] || '' : '';
-                                results.push({name, preview, phone, badge: badge.textContent});
+                                const titleSpan = el.querySelector('span[dir="auto"]');
+                                const name = titleSpan ? titleSpan.textContent.trim() : '';
+                                // Message preview: look in different places
+                                let preview = '';
+                                const previewSelectors = [
+                                    'div[data-testid="conversation-info-message"]',
+                                    'div[data-testid="last-msg"]',
+                                    'div[data-testid="cell-message"]',
+                                    'span[data-testid="conversation-info-message"]',
+                                ];
+                                for (const sel of previewSelectors) {
+                                    const p = el.querySelector(sel);
+                                    if (p && p.textContent) { preview = p.textContent.trim(); break; }
+                                }
+                                if (!preview) {
+                                    // Fallback: find spans not in the title area
+                                    const allDivs = el.querySelectorAll('div');
+                                    for (const d of allDivs) {
+                                        if (d.childElementCount <= 1 && d.textContent && d.textContent.trim().length > 3) {
+                                            const t = d.textContent.trim();
+                                            if (t !== name && t.length > preview.length) preview = t;
+                                        }
+                                    }
+                                }
+                                // Phone from link
+                                const link = el.closest('a') || el.querySelector('a');
+                                const href = link?.getAttribute('href') || '';
+                                const phone = href.includes('phone=') ? href.split('phone=')[1]?.split('&')[0] : '';
+                                if (name) results.push({
+                                    name, preview: preview.substring(0,100),
+                                    phone: phone ? decodeURIComponent(phone) : ''
+                                });
                             }
                             return results.slice(0, 5);
                         })()
                     """)
 
-                    if chats:
-                        state = str([(c['name'], c['badge']) for c in chats])
-                        if state != last_state:
-                            last_state = state
-                            for c in chats:
-                                if c['preview'].startswith('!') and self._on_msg:
-                                    phone = c['phone'] or c['name']
-                                    print(f"  📩 DOM Cmd: {c['name']} - {c['preview'][:60]}")
+                    if unread:
+                        # Clean previews
+                        for u in unread:
+                            prev = u.get('preview', '')
+                            name = u.get('name', '')
+                            for badgetxt in ['unread message', 'unread messages', 'muted']:
+                                if badgetxt in prev.lower():
+                                    parts = prev.split(badgetxt)
+                                    prev = parts[-1] if len(parts) > 1 else prev
+                                    break
+                            if prev.startswith(name):
+                                prev = prev[len(name):].strip()
+                            u['preview'] = prev.strip()
+
+                        state = str([(u['name'], u['preview'][:15]) for u in unread])
+                        if state != last_unread:
+                            last_unread = state
+                            diag += 1
+                            info = ', '.join(f"{u['name']}[{u['phone']}]={u['preview'][:25]}" for u in unread)
+                            print(f"  📬 Unread ({len(unread)}): {info}")
+                            for u in unread:
+                                if u['preview'].startswith('!') and self._on_msg:
+                                    phone = u['phone'] or u['name']
+                                    print(f"  🎯 Cmd from {u['name']}: {u['preview'][:60]} -> {phone}")
+                                    # Send reply using the name (WhatsApp resolves contacts by name in send URL)
                                     await self._safe_call(self._on_msg, {
-                                        "body": c['preview'],
+                                        "body": u['preview'],
                                         "from": phone,
-                                        "id": f"dom_{abs(hash(c['preview']))}",
+                                        "id": f"dom_{abs(hash(u['preview']))}",
                                         "chatId": phone,
                                     })
-                except Exception:
-                    pass
+                    else:
+                        if diag == 0:
+                            diag = 1
+                            # Log any chats found (even without badges)
+                            all_chats = await self.page.evaluate("""
+                                (() => {
+                                    const items = document.querySelectorAll('div[role="row"]');
+                                    return [...items].slice(0,5).map(el => {
+                                        const spans = el.querySelectorAll('span[dir="auto"]');
+                                        const name = spans[0]?.textContent?.trim() || '?';
+                                        const hasBadge = !!el.querySelector('[data-testid="icon-unread-count"], [aria-label*="unread"]');
+                                        return name + ' badge=' + hasBadge;
+                                    });
+                                })()
+                            """)
+                            print(f"  👀 Chats visible: {all_chats}")
+                except Exception as e:
+                    if diag < 2:
+                        diag = 2
+                        print(f"  ⚠️ Poll error: {e}")
             await asyncio.sleep(2)
 
     async def _call_poll(self):
@@ -434,7 +469,10 @@ class WApp:
                                   wait_until="domcontentloaded", timeout=15000)
             await asyncio.sleep(3)
             await self.page.keyboard.press("Enter")
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
+            # Navigate back to main chat list
+            await self.page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=15000)
+            await asyncio.sleep(2)
             return True
         except Exception:
             return False
