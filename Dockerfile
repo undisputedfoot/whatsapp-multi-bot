@@ -2,21 +2,22 @@
 #  WhatsApp Multi-Bot — Docker (Render / production)
 # ============================================================
 
+FROM node:20-slim AS node-base
+
 FROM python:3.12-slim
 
 LABEL description="WhatsApp Multi-Bot — Multi-session WhatsApp automation"
+
+# ── Install Node.js from node base ─────────────────────
+COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 # ── Install Chromium + system deps ─────────────────────
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-driver \
     && rm -rf /var/lib/apt/lists/*
-
-# Find chromium binary (path varies across Debian versions)
-RUN CHROME=$(which chromium 2>/dev/null || which chromium-browser 2>/dev/null || echo /usr/bin/chromium) && \
-    echo "Chromium binary: $CHROME" && \
-    CHROMEDRIVER=$(which chromedriver 2>/dev/null || echo /usr/bin/chromedriver) && \
-    echo "ChromeDriver: $CHROMEDRIVER"
 
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV BROWSER_MODE=local
@@ -25,6 +26,10 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # ── Working directory ───────────────────────────────────
 WORKDIR /app
+
+# ── Copy WA engine (Node.js) ──────────────────────────
+COPY wa-engine/ ./wa-engine/
+RUN cd wa-engine && npm install --production
 
 # ── Install Python deps ────────────────────────────────
 COPY requirements.txt .

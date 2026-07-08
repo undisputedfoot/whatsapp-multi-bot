@@ -1,12 +1,21 @@
 """
-WhatsApp Web engine - auto-selects Playwright or Selenium based on platform.
+WhatsApp Web engine - auto-selects HTTP (Baileys), Playwright, or Selenium.
 """
 
 import sys
 import platform
+import os
 
 
 # ── Auto-detect best engine ──────────────────
+# Prefer HTTP engine (whatsapp-web.js) if available
+_HAS_HTTP = False
+try:
+    import httpx
+    _HAS_HTTP = True
+except ImportError:
+    pass
+
 _HAS_PLAYWRIGHT = False
 try:
     import playwright  # noqa
@@ -21,13 +30,20 @@ _IS_TERMUX = "com.termux" in (sys.executable or "")
 if _IS_ARM or _IS_TERMUX:
     _HAS_PLAYWRIGHT = False
 
+# Engine override via env
+_ENGINE = os.environ.get("WA_ENGINE", "auto").lower()
+
 
 # ── Import the right engine ──────────────────
-if _HAS_PLAYWRIGHT:
+if _ENGINE == "http" or (_ENGINE == "auto" and _HAS_HTTP and not _IS_ARM):
+    from .whatsapp_http import WApp
+    print("  🌐 Using HTTP engine (whatsapp-web.js via Baileys)")
+elif _HAS_PLAYWRIGHT:
     from .whatsapp_playwright import WApp
     print("  🖥️  Using Playwright engine (desktop)")
 else:
     from .whatsapp_selenium import WApp
+    print("  📱 Using Selenium engine (mobile/Termux)")
     print("  📱  Using Selenium engine (ARM/Termux)")
 
     async def get_qr_data(self) -> str | None:

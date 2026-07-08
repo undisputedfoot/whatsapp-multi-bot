@@ -71,6 +71,69 @@ def _first_run_wizard():
     print()
 
 
+# ── WA Engine (Node.js) launcher ─────────────────────
+
+def _start_wa_engine():
+    """Start the Node.js WhatsApp engine as a subprocess."""
+    engine_dir = os.path.join(os.path.dirname(__file__), "wa-engine")
+    node_exe = shutil.which("node") or os.path.expanduser("~/nodejs/node.exe")
+    if not os.path.exists(node_exe):
+        print("  ⚠️  Node.js not found. Install Node.js v18+ for the WhatsApp engine.")
+        print("  ⚠️  Falling back to Playwright engine.")
+        os.environ["WA_ENGINE"] = "playwright"
+        return None
+
+    # Check if node_modules exists
+    if not os.path.exists(os.path.join(engine_dir, "node_modules")):
+        print("  ⚠️  wa-engine/node_modules not found. Run: cd wa-engine && npm install")
+        print("  ⚠️  Falling back to Playwright engine.")
+        os.environ["WA_ENGINE"] = "playwright"
+        return None
+
+    # Check if engine port is already in use
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    already_running = sock.connect_ex(('127.0.0.1', int(os.environ.get("WA_ENGINE_PORT", "5001")))) == 0
+    sock.close()
+
+    if already_running:
+        print("  🌐 WA Engine already running")
+        return None
+
+    print("  🚀 Starting WA Engine (whatsapp-web.js)...")
+    proc = subprocess.Popen(
+        [node_exe, "server.js"],
+        cwd=engine_dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    # Wait for it to be ready
+    import time, urllib.request
+    for i in range(30):
+        try:
+            r = urllib.request.urlopen("http://127.0.0.1:5001/health", timeout=2)
+            if r.status == 200:
+                print("  ✅ WA Engine ready!")
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+    else:
+        print("  ⚠️  WA Engine failed to start. Falling back to Playwright.")
+        os.environ["WA_ENGINE"] = "playwright"
+        return None
+
+    # Start a thread to read engine logs
+    def _read_logs():
+        for line in proc.stdout:
+            print(f"  [engine] {line.rstrip()}")
+    threading.Thread(target=_read_logs, daemon=True).start()
+
+    return proc
+
+
 # ── Bot startup ─────────────────────────────────────
 
 from core.config import BASE_DIR
@@ -112,6 +175,7 @@ def start_bot():
 
 def create_app():
     """Factory for gunicorn."""
+    _start_wa_engine()
     t_bot = threading.Thread(target=start_bot, daemon=True)
     t_bot.start()
     return app
@@ -128,7 +192,16 @@ if __name__ == "__main__":
     parser.add_argument("--host", type=str, default=None, help="Dashboard host")
     parser.add_argument("--setup", action="store_true", help="Run setup checks only, don't start bot")
     parser.add_argument("--reset-setup", action="store_true", help="Re-run the first-run wizard")
+    parser.add_argument("--engine", type=str, default=None, help="Engine: http, playwright, selenium (default: auto)")
     args = parser.parse_args()
+
+    # Apply engine override
+    if args.engine:
+        os.environ["WA_ENGINE"] = args.engine
+
+    # Start Node.js WhatsApp engine if using HTTP mode
+    if os.environ.get("WA_ENGINE", "auto") in ("auto", "http"):
+        _start_wa_engine()
 
     # Reset first-run flag if requested
     if args.reset_setup:
