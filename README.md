@@ -2,14 +2,16 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/WhatsApp-Web-25D366?logo=whatsapp" alt="WhatsApp Web">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/Android-Termux-brightgreen?logo=android" alt="Android">
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/AI-OpenAI%2FGemini-8A2BE2" alt="AI">
+  <a href="https://render.com/deploy?repo=https://github.com/undisputedfoot/whatsapp-multi-bot">
+    <img src="https://img.shields.io/badge/Deploy_to-Render-46E3B7?logo=render&style=for-the-badge" alt="Deploy to Render">
+  </a>
   <br>
   <h1>🤖 WhatsApp Multi-Bot</h1>
   <p><strong>Multi-account WhatsApp manager · AI-powered · Web dashboard · 8 languages</strong></p>
   <p>Run multiple WhatsApp accounts from one place. Read messages, send replies, automate everything from a beautiful mobile web dashboard. AI smart replies, group management, scheduled messages, and more — all <strong>free & open source</strong>.</p>
-  <p>⚡ <strong>30+ features</strong> · 📱 <strong>Works on Android (Termux)</strong> · ☁️ <strong>Deploy to Render/Koyeb</strong></p>
+  <p>⚡ <strong>30+ features</strong> · ☁️ <strong>Deploy to Render in 1 click</strong></p>
 </div>
 
 ---
@@ -83,14 +85,19 @@ python main.py
 # Open http://localhost:5000 in Chrome
 ```
 
-### 📱 iOS (Cloud Deploy)
+### ☁️ One-Click Deploy to Render (Free)
 
-Deploy to **Render** free tier — access the dashboard from Safari:
+[![Deploy to Render](https://img.shields.io/badge/Deploy_to-Render-46E3B7?logo=render&style=for-the-badge)](https://render.com/deploy?repo=https://github.com/undisputedfoot/whatsapp-multi-bot)
 
-1. Fork this repo → [render.com](https://render.com) → New Web Service
-2. **Build:** `pip install -r requirements.txt && python -m playwright install chromium`
-3. **Start:** `gunicorn -k eventlet -w 1 'main:create_app()'`
-4. Access the URL from your iPhone — the UI is fully mobile-optimized
+Click the button above → connect your GitHub → **deploy is automatic**.
+
+After deployment:
+1. Go to your Render dashboard → open the app URL
+2. Login: `admin` / `admin123`
+3. Go to **Dashboard** tab → click the 📱 button on your session card
+4. Scan the QR with WhatsApp → **done!**
+
+> **Note:** On Render free tier, the bot will sleep after inactivity. Use a free uptime monitor like [UptimeRobot](https://uptimerobot.com) to keep it awake.
 
 ---
 

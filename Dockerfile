@@ -1,14 +1,12 @@
 # ============================================================
-#  WhatsApp Multi-Bot — Docker
-#  Build:  docker build -t whatsapp-multi-bot .
-#  Run:    docker run -it -p 5000:5000 -v $(pwd)/data:/app/data whatsapp-multi-bot
+#  WhatsApp Multi-Bot — Docker (Render / production)
 # ============================================================
 
 FROM python:3.12-slim
 
 LABEL description="WhatsApp Multi-Bot — Multi-session WhatsApp automation"
 
-# ── Install Chromium ──────────────────────────────────────
+# ── System deps ─────────────────────────────────────────
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-sandbox \
@@ -16,26 +14,28 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CHROMIUM_PATH=/usr/bin/chromium
+ENV BROWSER_MODE=remote
+ENV PYTHONUNBUFFERED=1
 
-# ── Working directory ─────────────────────────────────────
+# ── Working directory ───────────────────────────────────
 WORKDIR /app
 
-# ── Install Python deps ──────────────────────────────────
+# ── Install Python deps ────────────────────────────────
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ── Install Playwright system deps & browser ─────────────
+# ── Playwright browser ─────────────────────────────────
 RUN python -m playwright install chromium
 RUN python -m playwright install-deps chromium
 
-# ── Copy source ──────────────────────────────────────────
+# ── Copy app source ────────────────────────────────────
 COPY . .
 
-# ── Create data directories ──────────────────────────────
-RUN mkdir -p data/sessions data/stickers
+# ── Data directories ───────────────────────────────────
+RUN mkdir -p data/sessions data/stickers data/media data/bot.db
 
-# ── Expose dashboard ─────────────────────────────────────
+# ── Port ────────────────────────────────────────────────
 EXPOSE 5000
 
-# ── Start ────────────────────────────────────────────────
-CMD ["python", "main.py"]
+# ── Start (gunicorn for production) ────────────────────
+CMD ["sh", "-c", "gunicorn -k eventlet -w 1 -b 0.0.0.0:5000 'main:create_app()'"]
