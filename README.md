@@ -11,7 +11,7 @@
   <h1>🤖 WhatsApp Multi-Bot</h1>
   <p><strong>Multi-account WhatsApp manager · AI-powered · Web dashboard · 8 languages</strong></p>
   <p>Run multiple WhatsApp accounts from one place. Read messages, send replies, automate everything from a beautiful mobile web dashboard. AI smart replies, group management, scheduled messages, and more — all <strong>free & open source</strong>.</p>
-  <p>⚡ <strong>40+ features</strong> · ☁️ <strong>Deploy to Render in 1 click</strong></p>
+  <p>⚡ <strong>50+ features</strong> · ☁️ <strong>Deploy to Render in 1 click</strong></p>
 </div>
 
 ---
@@ -74,6 +74,14 @@ python -m playwright install chromium && python main.py
 | **📩 PM Mode** | `!pdm on/off` — restrict PMs to group members only (like Levanter) |
 | **🔘 Toggle** | `!tog <cmd> on/off` — enable/disable commands (like Levanter) |
 | **📋 Variables** | `!setvar`, `!getvar`, `!delvar`, `!listvars` — per-session storage (like Levanter) |
+| **📘 Facebook DL** | `!fb <url>` — download Facebook videos (like Levanter) |
+| **📸 Story DL** | `!story <user>` — download Instagram/FB stories (like Levanter) |
+| **🖥️ Screenshot** | `!ss <url>`, `!fullss <url>` — capture web pages (like Levanter) |
+| **📱 QR Code** | `!qr <text>` — generate QR codes (like Levanter) |
+| **📇 JID/Block** | `!jid`, `!block`, `!fullpp` — profile commands (like Levanter) |
+| **🎨 Sticker Info** | `!exif` — view sticker metadata (like Levanter) |
+| **🖼️ Remove BG** | `!rmbg` — remove image backgrounds (like Levanter) |
+| **📦 APK DL** | `!apk <app>` — search APKMirror (like Levanter) |
 | **Auto-Reply** | Keyword matching per language |
 | **🌐 8 Languages** | EN · ES · HI · AR · FR · PT · DE · JA |
 | **📊 Analytics** | Message stats, doughnut chart, top contacts chart |

@@ -361,6 +361,62 @@ class Session:
             if not handled:
                 await self.wapp.send_text(sender, t(self.lang, "not_found"))
 
+        # ── Levanter: Facebook downloader ──
+        elif cmd == "!fb":
+            from plugins import facebook
+            handled = await facebook.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: Story downloader ──
+        elif cmd == "!story":
+            from plugins import story
+            handled = await story.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: Screenshot (ss/fullss) ──
+        elif cmd in ("!ss", "!fullss"):
+            from plugins import ss
+            handled = await ss.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: QR code ──
+        elif cmd == "!qr":
+            from plugins import qr
+            handled = await qr.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: Profile (jid/block/fullpp) ──
+        elif cmd in ("!jid", "!block", "!fullpp"):
+            from plugins import profile
+            handled = await profile.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: Exif sticker viewer ──
+        elif cmd == "!exif":
+            from plugins import exif
+            handled = await exif.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: RemoveBG ──
+        elif cmd == "!rmbg":
+            from plugins import removebg
+            handled = await removebg.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: APK downloader ──
+        elif cmd == "!apk":
+            from plugins import apk
+            handled = await apk.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
         # ── Custom commands (setcmd/delcmd/listcmds) ──
         elif cmd in ("!setcmd", "!delcmd", "!listcmds"):
             handled = await self.features["custom_cmds"].handle_command(
