@@ -90,9 +90,18 @@ def start_bot():
     print("  🤖 WhatsApp Multi-Bot")
     print("  Multi-session · Multi-language · Automation")
     print("=" * 50)
+    print("  Dashboard: http://localhost:5000")
+    print("  Login: admin / admin123")
+    print("=" * 50)
 
     try:
-        loop.run_until_complete(manager.start_all())
+        try:
+            loop.run_until_complete(manager.start_all())
+        except Exception as e:
+            print(f"  ❌ Bot startup error: {e}")
+            print("  ⚠️  Dashboard will still work for configuration.")
+            import traceback
+            traceback.print_exc()
         loop.run_forever()
     except KeyboardInterrupt:
         loop.run_until_complete(manager.stop_all())

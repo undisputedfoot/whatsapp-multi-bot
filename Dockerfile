@@ -9,14 +9,15 @@ LABEL description="WhatsApp Multi-Bot — Multi-session WhatsApp automation"
 # ── Install Chromium + system deps ─────────────────────
 RUN apt-get update && apt-get install -y \
     chromium \
-    chromium-sandbox \
-    chromium-chromedriver \
+    chromium-driver \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Find where chromium was actually installed
-RUN CHROME=$(which chromium || which chromium-browser || echo /usr/bin/chromium) && \
-    echo "Chromium at: $CHROME"
+# Find chromium binary (path varies across Debian versions)
+RUN CHROME=$(which chromium 2>/dev/null || which chromium-browser 2>/dev/null || echo /usr/bin/chromium) && \
+    echo "Chromium binary: $CHROME" && \
+    CHROMEDRIVER=$(which chromedriver 2>/dev/null || echo /usr/bin/chromedriver) && \
+    echo "ChromeDriver: $CHROMEDRIVER"
 
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV BROWSER_MODE=local
