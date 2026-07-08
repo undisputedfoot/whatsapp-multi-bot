@@ -7,8 +7,9 @@
   <img src="https://img.shields.io/badge/AI-OpenAI%2FGemini-8A2BE2" alt="AI">
   <br>
   <h1>🤖 WhatsApp Multi-Bot</h1>
-  <p><strong>Multi-session · 8 Languages · AI-Powered · Web Inbox</strong></p>
-  <p>Run multiple WhatsApp accounts from one place. Read & reply from the web dashboard. AI smart replies. Works on your <strong>phone (Android/iOS)</strong>, desktop, or cloud.</p>
+  <p><strong>Multi-account WhatsApp manager · AI-powered · Web dashboard · 8 languages</strong></p>
+  <p>Run multiple WhatsApp accounts from one place. Read messages, send replies, automate everything from a beautiful mobile web dashboard. AI smart replies, group management, scheduled messages, and more — all <strong>free & open source</strong>.</p>
+  <p>⚡ <strong>30+ features</strong> · 📱 <strong>Works on Android (Termux)</strong> · ☁️ <strong>Deploy to Render/Koyeb</strong></p>
 </div>
 
 ---
