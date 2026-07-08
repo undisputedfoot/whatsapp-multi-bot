@@ -41,32 +41,17 @@ class WApp:
         self._known_messages = set()
 
     async def start(self):
-        """Launch Chrome and open WhatsApp Web."""
+        """Launch Chrome and open WhatsApp Web.
+        Note: On Termux/Android, Chrome headless may not work.
+        Falls back gracefully so the dashboard still runs."""
         user_dir = str(SESSION_DIR / self.name)
         os.makedirs(user_dir, exist_ok=True)
 
-        opts = Options()
-        opts.add_argument(f"--user-data-dir={user_dir}")
-
-        # Termux/Android headless flags
-        opts.add_argument("--headless=new")
-        opts.add_argument("--no-sandbox")
-        opts.add_argument("--disable-setuid-sandbox")
-        opts.add_argument("--disable-dev-shm-usage")
-        opts.add_argument("--disable-gpu")
-        opts.add_argument("--disable-software-rasterizer")
-        opts.add_argument("--disable-features=VizDisplayCompositor")
-        opts.add_argument("--window-size=800,600")
-        opts.add_argument("--remote-debugging-port=0")
-        opts.add_argument("--disable-extensions")
-        opts.add_argument("--disable-sync")
-        opts.add_argument("--single-process")
-        opts.add_argument("--no-zygote")
-        opts.add_experimental_option("excludeSwitches", ["enable-logging", "enable-automation"])
-
-        # Find Chromium and chromedriver binaries
         import shutil
-        chrome_paths = [
+
+        # Find Chromium binary
+        chrome_bin = None
+        for p in [
             shutil.which("chromium"),
             shutil.which("chromium-browser"),
             shutil.which("google-chrome"),
@@ -75,40 +60,65 @@ class WApp:
             "/data/data/com.termux/files/usr/bin/chromium",
             "/usr/bin/chromium",
             "/usr/bin/chromium-browser",
-        ]
-        for p in chrome_paths:
+        ]:
             if p and os.path.exists(p):
-                opts.binary_location = p
+                chrome_bin = p
                 break
 
-        driver_paths = [
+        # Find chromedriver binary
+        driver_bin = None
+        for p in [
             shutil.which("chromedriver"),
             "/data/data/com.termux/files/usr/bin/chromedriver",
             "/usr/bin/chromedriver",
-        ]
-        driver_path = None
-        for p in driver_paths:
+        ]:
             if p and os.path.exists(p):
-                driver_path = p
+                driver_bin = p
                 break
 
-        # Set mobile user agent so WhatsApp Web doesn't block mobile browsers
-        opts.add_argument(
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-            'AppleWebKit/537.36 (KHTML, like Gecko) '
-            'Chrome/120.0.0.0 Safari/537.36'
-        )
+        if not chrome_bin:
+            self.connected = False
+            print("  ⚠️  Chrome not found. Dashboard will still work.")
+            print("  📱  Run the bot on a desktop, then access from your phone.")
+            print(f"  🌐  Dashboard: http://localhost:{os.environ.get('DASHBOARD_PORT', '5000')}")
+            return self
 
-        if driver_path:
-            from selenium.webdriver.chrome.service import Service
-            service = Service(executable_path=driver_path)
-            # Increase timeout for slow Termux startup
-            service.start_timeout = 60
-            self.driver = webdriver.Chrome(options=opts, service=service)
-        else:
-            self.driver = webdriver.Chrome(options=opts)
-        self.driver.set_page_load_timeout(60)
-        self.driver.get("https://web.whatsapp.com")
+        try:
+            opts = Options()
+            opts.add_argument(f"--user-data-dir={user_dir}")
+            opts.add_argument("--headless=new")
+            opts.add_argument("--no-sandbox")
+            opts.add_argument("--disable-setuid-sandbox")
+            opts.add_argument("--disable-dev-shm-usage")
+            opts.add_argument("--disable-gpu")
+            opts.add_argument("--disable-software-rasterizer")
+            opts.add_argument("--disable-features=VizDisplayCompositor")
+            opts.add_argument("--window-size=800,600")
+            opts.add_argument("--remote-debugging-port=0")
+            opts.add_argument("--disable-extensions")
+            opts.add_argument("--single-process")
+            opts.add_argument("--no-zygote")
+            opts.add_argument(
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/120.0.0.0 Safari/537.36'
+            )
+            opts.binary_location = chrome_bin
+
+            if driver_bin:
+                from selenium.webdriver.chrome.service import Service
+                service = Service(executable_path=driver_bin, start_timeout=60)
+                self.driver = webdriver.Chrome(options=opts, service=service)
+            else:
+                self.driver = webdriver.Chrome(options=opts)
+
+            self.driver.set_page_load_timeout(60)
+            self.driver.get("https://web.whatsapp.com")
+        except Exception as e:
+            print(f"  ⚠️  Could not start Chrome: {e}")
+            print("  📱  Run the bot on a desktop instead.")
+            print("  🌐  Dashboard will still work at http://localhost:5000")
+            self.connected = False
 
         # Start monitoring loops
         asyncio.create_task(self._auth_loop())
