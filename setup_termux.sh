@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 🤖 WhatsApp Multi-Bot - One-command Termux Setup
-# Run: curl -sSL https://raw.githubusercontent.com/YOUR_USER/REPO/main/setup_termux.sh | bash
+# Run: curl -sSL https://raw.githubusercontent.com/undisputedfoot/whatsapp-multi-bot/main/setup_termux.sh | bash
 # Or: bash setup_termux.sh
 
 set -e
@@ -32,7 +32,7 @@ if [ -d "$REPO_DIR" ]; then
 else
     echo -e "${YELLOW}[3/5] Downloading...${NC}"
     cd "$HOME"
-    git clone https://github.com/YOUR_USER/whatsapp-multi-bot.git
+    git clone https://github.com/undisputedfoot/whatsapp-multi-bot.git
     cd "$REPO_DIR"
 fi
 
