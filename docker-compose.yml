@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    container_name: whatsapp-multi-bot
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist sessions & DB across restarts
+      - ./data:/app/data
+      # Mount your .env for configuration
+      - ./.env:/app/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Analytics · WhatsApp Multi-Bot</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    body{background:#0f172a;color:#f1f5f9;min-height:100vh;padding-bottom:80px}
+    header{background:#1e293b;padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50}
+    header h1{font-size:17px;flex:1}
+    header select{background:#0f172a;border:1px solid #334155;color:#f1f5f9;padding:6px 10px;border-radius:8px;font-size:13px;max-width:120px}
+
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px}
+    .stat-card{background:#1e293b;border-radius:14px;padding:18px;text-align:center;border:1px solid #334155}
+    .stat-card .num{font-size:32px;font-weight:700;color:#25d366}
+    .stat-card .label{font-size:12px;color:#94a3b8;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+
+    .section{padding:0 16px;margin-bottom:20px}
+    .section h2{font-size:14px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+    .graph{background:#1e293b;border-radius:14px;padding:16px;border:1px solid #334155;min-height:100px}
+
+    .bar-chart{display:flex;flex-direction:column;gap:6px}
+    .bar-row{display:flex;align-items:center;gap:8px}
+    .bar-row .label{font-size:13px;width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8}
+    .bar-row .bar-track{flex:1;height:20px;background:#0f172a;border-radius:10px;overflow:hidden}
+    .bar-row .bar-fill{height:100%;background:linear-gradient(90deg,#25d366,#10b981);border-radius:10px;transition:width .5s;min-width:4px}
+    .bar-row .val{font-size:12px;color:#64748b;width:30px;text-align:right}
+
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;display:flex;border-top:1px solid #334155;z-index:50}
+    .tab-bar a{flex:1;text-align:center;padding:10px;color:#64748b;text-decoration:none;font-size:11px}
+    .tab-bar a.active{color:#25d366}
+    .tab-bar a span{font-size:20px;display:block;margin-bottom:2px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 Analytics</h1>
+    <select id="session-select" onchange="refresh()">
+      <option value="main">main</option>
+    </select>
+  </header>
+
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="num" id="stat-in">0</div><div class="label">Received</div></div>
+    <div class="stat-card"><div class="num" id="stat-out">0</div><div class="label">Sent</div></div>
+    <div class="stat-card"><div class="num" id="stat-total">0</div><div class="label">Total</div></div>
+    <div class="stat-card"><div class="num" id="stat-contacts">0</div><div class="label">Contacts</div></div>
+  </div>
+
+  <div class="section">
+    <h2>🏆 Top Contacts</h2>
+    <div class="graph" id="top-contacts">
+      <div style="text-align:center;color:#64748b;padding:20px">Loading…</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Message Distribution</h2>
+    <div class="graph" style="display:flex;justify-content:center;padding:10px">
+      <canvas id="msg-chart" style="max-width:240px;max-height:240px"></canvas>
+    </div>
+  </div>
+
+  <nav class="tab-bar">
+    <a href="/"><span>📡</span>Dashboard</a>
+    <a href="/inbox"><span>💬</span>Inbox</a>
+    <a href="/search"><span>🔍</span>Search</a>
+    <a href="/media"><span>📸</span>Media</a>
+    <a href="/groups"><span>👥</span>Groups</a>
+    <a href="/analytics" class="active"><span>📊</span>Analytics</a>
+    <a href="/settings"><span>⚙️</span>Settings</a>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    let msgChart = null;
+
+    fetch('/api/sessions').then(r => r.json()).then(sessions => {
+      const sel = document.getElementById('session-select');
+      sel.innerHTML = sessions.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+      refresh();
+    });
+
+    function refresh() {
+      const session = document.getElementById('session-select').value;
+      fetch('/api/analytics/' + session)
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('stat-in').textContent = data.inbound;
+          document.getElementById('stat-out').textContent = data.outbound;
+          document.getElementById('stat-total').textContent = data.total;
+          document.getElementById('stat-contacts').textContent = data.contacts;
+
+          // Bar chart
+          const top = data.top_contacts || [];
+          const maxVal = Math.max(...top.map(t => t.c), 1);
+          const container = document.getElementById('top-contacts');
+          if (!top.length) {
+            container.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px">No data yet</div>';
+            return;
+          }
+          container.innerHTML = '<div class="bar-chart">' +
+            top.map(t => `
+              <div class="bar-row">
+                <div class="label">${(t.peer||'?').substring(0,12)}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${(t.c/maxVal*100).toFixed(0)}%"></div></div>
+                <div class="val">${t.c}</div>
+              </div>
+            `).join('') + '</div>';
+
+          // Doughnut chart
+          const canvas = document.getElementById('msg-chart');
+          if (msgChart) msgChart.destroy();
+          msgChart = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+              labels: ['Received', 'Sent'],
+              datasets: [{
+                data: [data.inbound, data.outbound],
+                backgroundColor: ['#25d366', '#3b82f6'],
+                borderWidth: 0,
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: '#94a3b8' } } },
+              cutout: '65%',
+            }
+          });
+        });
+    }
+
+    setInterval(refresh, 10000);
+  </script>
+</body>
+</html>

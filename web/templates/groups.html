@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Groups · WhatsApp Multi-Bot</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    body{background:#0f172a;color:#f1f5f9;min-height:100vh;padding-bottom:80px}
+    header{background:#1e293b;padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50}
+    header h1{font-size:17px;flex:1}
+    header select{background:#0f172a;border:1px solid #334155;color:#f1f5f9;padding:6px 10px;border-radius:8px;font-size:13px;max-width:120px}
+    section{padding:16px}
+    .card{background:#1e293b;border-radius:14px;border:1px solid #334155;padding:16px;margin-bottom:14px}
+    .card h3{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+    .card label{display:block;font-size:12px;color:#94a3b8;margin:8px 0 4px}
+    .card input,.card textarea{width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;color:#f1f5f9;font-size:14px;outline:none;margin-bottom:6px}
+    .card input:focus,.card textarea:focus{border-color:#25d366}
+    .card textarea{min-height:60px;resize:vertical}
+    .card button{background:#25d366;color:#0f172a;border:none;padding:8px 16px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;margin-top:6px}
+    .card button.danger{background:#ef4444;color:#fff}
+    .card .hint{font-size:11px;color:#64748b;margin-top:4px}
+    .group-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e293b}
+    .group-item:last-child{border-bottom:none}
+    .group-item .name{font-weight:500;font-size:14px}
+    .group-item .badge{background:#0f172a;padding:2px 8px;border-radius:6px;font-size:11px;color:#94a3b8}
+    .member-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#94a3b8;border-bottom:1px solid #0f172a}
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;display:flex;border-top:1px solid #334155;z-index:50}
+    .tab-bar a{flex:1;text-align:center;padding:10px;color:#64748b;text-decoration:none;font-size:11px}
+    .tab-bar a.active{color:#25d366}
+    .tab-bar a span{font-size:20px;display:block;margin-bottom:2px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>👥 Groups</h1>
+    <select id="session-select" onchange="refresh()">
+      <option value="main">main</option>
+    </select>
+  </header>
+
+  <section>
+    <!-- Admin Management -->
+    <div class="card">
+      <h3>🛡️ Bot Admins</h3>
+      <div id="admin-list"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input type="text" id="admin-peer" placeholder="Phone number (15551234567)" style="flex:1">
+        <button onclick="addAdmin()">+ Add</button>
+      </div>
+      <div class="hint">Admins can use !kick, !promote, !groupwelcome, !broadcast commands</div>
+    </div>
+
+    <!-- Broadcast Lists -->
+    <div class="card">
+      <h3>📨 Broadcast Lists</h3>
+      <div id="broadcast-lists"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input type="text" id="blist-name" placeholder="List name" style="flex:1;width:40%">
+        <input type="text" id="blist-members" placeholder="Numbers (comma-separated)" style="flex:2">
+        <button onclick="saveBroadcastList()">Save</button>
+      </div>
+      <div class="hint">Send to a list from WhatsApp: !broadcast listname Your message</div>
+    </div>
+  </section>
+
+  <nav class="tab-bar">
+    <a href="/"><span>📡</span>Dashboard</a>
+    <a href="/inbox"><span>💬</span>Inbox</a>
+    <a href="/search"><span>🔍</span>Search</a>
+    <a href="/media"><span>📸</span>Media</a>
+    <a href="/groups" class="active"><span>👥</span>Groups</a>
+    <a href="/analytics"><span>📊</span>Analytics</a>
+    <a href="/settings"><span>⚙️</span>Settings</a>
+  </nav>
+
+  <script>
+    let currentSession = 'main';
+
+    document.getElementById('session-select').value = currentSession;
+    fetch('/api/sessions').then(r=>r.json()).then(sessions => {
+      const sel = document.getElementById('session-select');
+      sel.innerHTML = sessions.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+      currentSession = sel.value;
+      refresh();
+    });
+
+    function refresh() {
+      currentSession = document.getElementById('session-select').value;
+      loadAdmins();
+      loadBroadcastLists();
+    }
+
+    // ── Admins ──
+    function loadAdmins() {
+      fetch('/api/admins/' + currentSession).then(r=>r.json()).then(admins => {
+        const el = document.getElementById('admin-list');
+        if (!admins.length) { el.innerHTML = '<div style="color:#64748b;font-size:13px;">No custom admins. Super-admins from .env file still apply.</div>'; return; }
+        el.innerHTML = admins.map(a => `
+          <div class="group-item">
+            <span class="name">${a.peer}</span>
+            <span><span class="badge">${a.role}</span>
+            <button class="danger" style="padding:4px 10px;font-size:11px;margin-left:6px" onclick="removeAdmin('${a.peer}')">✕</button></span>
+          </div>
+        `).join('');
+      });
+    }
+
+    function addAdmin() {
+      const peer = document.getElementById('admin-peer').value.trim();
+      if (!peer) return;
+      fetch('/api/admins', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session:currentSession,peer})})
+        .then(r=>r.json()).then(() => { document.getElementById('admin-peer').value=''; loadAdmins(); });
+    }
+
+    function removeAdmin(peer) {
+      fetch('/api/admins/' + currentSession + '/' + encodeURIComponent(peer), {method:'DELETE'})
+        .then(r=>r.json()).then(() => loadAdmins());
+    }
+
+    // ── Broadcast Lists ──
+    function loadBroadcastLists() {
+      fetch('/api/broadcast-lists/' + currentSession).then(r=>r.json()).then(lists => {
+        const el = document.getElementById('broadcast-lists');
+        if (!lists.length) { el.innerHTML = '<div style="color:#64748b;font-size:13px;">No broadcast lists yet.</div>'; return; }
+        el.innerHTML = lists.map(l => `
+          <div class="group-item">
+            <div>
+              <div class="name">📋 ${l.name}</div>
+              <div style="font-size:11px;color:#64748b">${l.members.length} recipients</div>
+            </div>
+            <button class="danger" style="padding:4px 10px;font-size:11px" onclick="deleteList(${l.id})">✕</button>
+          </div>
+        `).join('');
+      });
+    }
+
+    function saveBroadcastList() {
+      const name = document.getElementById('blist-name').value.trim();
+      const membersStr = document.getElementById('blist-members').value.trim();
+      if (!name || !membersStr) return;
+      const members = membersStr.split(',').map(s=>s.trim()).filter(Boolean);
+      fetch('/api/broadcast-lists', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session:currentSession,name,members})})
+        .then(r=>r.json()).then(() => { document.getElementById('blist-name').value=''; document.getElementById('blist-members').value=''; loadBroadcastLists(); });
+    }
+
+    function deleteList(id) {
+      fetch('/api/broadcast-lists/' + id, {method:'DELETE'}).then(r=>r.json()).then(() => loadBroadcastLists());
+    }
+  </script>
+</body>
+</html>

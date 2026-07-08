@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+data/
+*.woff2
+.DS_Store
+.first_run_done

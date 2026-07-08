@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Settings · WhatsApp Multi-Bot</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    body{background:#0f172a;color:#f1f5f9;min-height:100vh;padding-bottom:80px}
+    header{background:#1e293b;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50}
+    header a{color:#94a3b8;text-decoration:none;font-size:18px}
+    header h1{font-size:18px;flex:1}
+    section{margin:20px 16px}
+    section h2{font-size:14px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+    .card{background:#1e293b;border-radius:14px;border:1px solid #334155;padding:16px;margin-bottom:14px}
+    .card label{display:block;font-size:13px;color:#94a3b8;margin-bottom:6px}
+    .card textarea,.card input[type=text]{width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px;color:#f1f5f9;font-size:14px;outline:none;transition:border .2s;font-family:monospace}
+    .card textarea:focus,.card input:focus{border-color:#25d366}
+    .card textarea{min-height:120px;resize:vertical}
+    .card button{background:#25d366;color:#0f172a;border:none;padding:10px 20px;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;margin-top:10px;transition:transform .15s}
+    .card button:active{transform:scale(.97)}
+    .card .hint{font-size:12px;color:#64748b;margin-top:6px}
+    .saved-toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#25d366;color:#0f172a;padding:10px 24px;border-radius:30px;font-weight:600;font-size:14px;opacity:0;transition:opacity .3s;z-index:100;pointer-events:none}
+    .saved-toast.show{opacity:1}
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;display:flex;border-top:1px solid #334155;z-index:50}
+    .tab-bar a{flex:1;text-align:center;padding:12px;color:#64748b;text-decoration:none;font-size:12px;transition:color .2s}
+    .tab-bar a.active{color:#25d366}
+    .tab-bar a span{font-size:20px;display:block;margin-bottom:2px}
+    .badge{display:inline-block;background:#0f172a;padding:2px 10px;border-radius:8px;font-size:12px;color:#94a3b8;margin:2px}
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">←</a>
+    <h1>⚙️ Settings</h1>
+  </header>
+
+  <div id="saved-toast" class="saved-toast">✅ Saved!</div>
+
+  <!-- ── Auto-Reply Rules ── -->
+  <section>
+    <h2>💬 Auto-Reply Rules</h2>
+    <div class="card">
+      <label for="reply-lang">Language</label>
+      <select id="reply-lang" onchange="loadRules()" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;color:#f1f5f9;width:100%;font-size:14px;margin-bottom:12px">
+        {% for l in langs %}
+        <option value="{{ l }}">{{ l }}</option>
+        {% endfor %}
+      </select>
+      <label for="rules-editor">Rules (JSON) — keyword lists + response</label>
+      <textarea id="rules-editor" placeholder='[{"keywords":["hello","hi"],"response":"Hello there!"}]'></textarea>
+      <div class="hint">Each rule: { "keywords": ["word1", "word2"], "response": "Your reply" }</div>
+      <button onclick="saveRules()">💾 Save Rules</button>
+    </div>
+  </section>
+
+  <!-- ── Info ── -->
+  <section>
+    <h2>ℹ️ Quick Tips</h2>
+    <div class="card" style="font-size:13px;color:#94a3b8;line-height:1.7">
+      <p><strong>📱 Android (Termux):</strong> Run the install script and open the dashboard in your browser.</p>
+      <p><strong>📱 iOS:</strong> Deploy to Render/Koyeb and access the dashboard via the cloud URL.</p>
+      <p><strong>🔄 Restart sessions</strong> from the Dashboard tab if they disconnect.</p>
+      <p><strong>🌐 Change language</strong> per session using the <code>!lang</code> command in WhatsApp.</p>
+    </div>
+  </section>
+
+  <!-- ── Message Templates ── -->
+  <section>
+    <h2>📝 Message Templates</h2>
+    <div class="card">
+      <label>Template Name</label>
+      <input type="text" id="tmpl-name" placeholder="welcome, goodbye, etc.">
+      <label style="margin-top:10px">Template Body</label>
+      <textarea id="tmpl-body" placeholder="Type your template message..."></textarea>
+      <button onclick="saveTemplate()">💾 Save Template</button>
+      <div id="tmpl-list" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ── Contacts ── -->
+  <section>
+    <h2>👤 Contacts & Birthdays</h2>
+    <div class="card">
+      <label>Contact Number (with country code)</label>
+      <input type="text" id="contact-peer" placeholder="15551234567">
+      <label style="margin-top:10px">Name</label>
+      <input type="text" id="contact-name" placeholder="John Doe">
+      <label style="margin-top:10px">Birthday (MM-DD)</label>
+      <input type="text" id="contact-bday" placeholder="12-25">
+      <button onclick="saveContact()">💾 Save Contact</button>
+    </div>
+  </section>
+
+  <nav class="tab-bar">
+    <a href="/"><span>📡</span>Dashboard</a>
+    <a href="/inbox"><span>💬</span>Inbox</a>
+    <a href="/search"><span>🔍</span>Search</a>
+    <a href="/media"><span>📸</span>Media</a>
+    <a href="/groups"><span>👥</span>Groups</a>
+    <a href="/analytics"><span>📊</span>Analytics</a>
+    <a href="/settings" class="active"><span>⚙️</span>Settings</a>
+  </nav>
+
+  <script>
+    function toast() {
+      const el = document.getElementById('saved-toast');
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2000);
+    }
+
+    // ── Auto-reply rules ──
+    function loadRules() {
+      const lang = document.getElementById('reply-lang').value;
+      fetch('/api/reply-rules?lang=' + lang)
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('rules-editor').value = JSON.stringify(data.rules, null, 2);
+        }).catch(() => {});
+    }
+
+    function saveRules() {
+      const lang = document.getElementById('reply-lang').value;
+      let rules;
+      try { rules = JSON.parse(document.getElementById('rules-editor').value); }
+      catch(e) { alert('Invalid JSON!'); return; }
+      fetch('/api/reply-rules', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({lang, rules})
+      }).then(r => r.json()).then(() => toast()).catch(() => alert('Error saving'));
+    }
+
+    // ── Templates ──
+    function loadTemplates() {
+      fetch('/api/templates?lang=en').then(r => r.json()).then(data => {
+        const list = document.getElementById('tmpl-list');
+        list.innerHTML = '<div style="font-size:12px;color:#64748b;margin-bottom:6px">Saved templates:</div>' +
+          (data.templates || []).map(t =>
+            `<span class="badge" onclick="document.getElementById('tmpl-body').value=this.dataset.body;document.getElementById('tmpl-name').value='${t.name}'" data-body="${t.body.replace(/"/g,'&quot;')}">📄 ${t.name}</span>`
+          ).join('') || '<div style="font-size:12px;color:#64748b">No templates yet</div>';
+      });
+    }
+
+    function saveTemplate() {
+      const name = document.getElementById('tmpl-name').value.trim();
+      const body = document.getElementById('tmpl-body').value.trim();
+      if (!name || !body) { alert('Fill in name and body'); return; }
+      fetch('/api/templates', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, body, lang: 'en'})
+      }).then(r => r.json()).then(() => { toast(); loadTemplates(); });
+    }
+
+    // ── Contacts ──
+    function saveContact() {
+      const peer = document.getElementById('contact-peer').value.trim();
+      const name = document.getElementById('contact-name').value.trim();
+      const birthday = document.getElementById('contact-bday').value.trim();
+      if (!peer) { alert('Enter a phone number'); return; }
+      fetch('/api/contacts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session: 'main', peer, name, birthday, notes: ''})
+      }).then(r => r.json()).then(() => toast());
+    }
+
+    loadRules();
+    loadTemplates();
+  </script>
+</body>
+</html>

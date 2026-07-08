@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Media · WhatsApp Multi-Bot</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,sans-serif}
+    body{background:#0f172a;color:#f1f5f9;min-height:100vh;padding-bottom:80px}
+    header{background:#1e293b;padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50}
+    header h1{font-size:17px;flex:1}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:16px}
+    .media-item{background:#1e293b;border-radius:12px;overflow:hidden;border:1px solid #334155}
+    .media-item img,.media-item video{width:100%;height:140px;object-fit:cover;display:block}
+    .media-item .info{padding:8px;font-size:11px;color:#94a3b8}
+    .media-item .info .peer{font-weight:500;color:#f1f5f9}
+    .empty{text-align:center;padding:60px 20px;color:#64748b}
+    .empty .big{font-size:48px;margin-bottom:12px}
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;display:flex;border-top:1px solid #334155;z-index:50}
+    .tab-bar a{flex:1;text-align:center;padding:10px;color:#64748b;text-decoration:none;font-size:11px}
+    .tab-bar a.active{color:#25d366}
+    .tab-bar a span{font-size:20px;display:block;margin-bottom:2px}
+  </style>
+</head>
+<body>
+  <header><h1>📸 Media Gallery</h1></header>
+  <div class="grid" id="media-grid">
+    <div class="empty"><div class="big">📸</div><p>No media yet. Enable MEDIA_AUTO_DOWNLOAD in .env</p></div>
+  </div>
+  <nav class="tab-bar">
+    <a href="/"><span>📡</span>Dashboard</a>
+    <a href="/inbox"><span>💬</span>Inbox</a>
+    <a href="/media" class="active"><span>📸</span>Media</a>
+    <a href="/groups"><span>👥</span>Groups</a>
+    <a href="/analytics"><span>📊</span>Analytics</a>
+    <a href="/settings"><span>⚙️</span>Settings</a>
+  </nav>
+  <script>
+    fetch('/api/media/main').then(r=>r.json()).then(items => {
+      const grid = document.getElementById('media-grid');
+      if (!items.length) return;
+      grid.innerHTML = items.map(m => `
+        <div class="media-item">
+          ${m.mime_type?.startsWith('video/')
+            ? `<video src="/media-file/${encodeURIComponent(m.file_path)}" controls></video>`
+            : `<img src="/media-file/${encodeURIComponent(m.file_path)}" loading="lazy">`
+          }
+          <div class="info">
+            <div class="peer">${m.peer || '?'}</div>
+            <div>${(m.created_at||'').slice(11,19)}</div>
+          </div>
+        </div>
+      `).join('');
+    });
+  </script>
+</body>
+</html>

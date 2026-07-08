@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Multi-Bot · Login</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);padding:16px}
+    .card{background:#1e293b;border-radius:20px;padding:40px 32px;width:100%;max-width:380px;box-shadow:0 25px 60px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.06)}
+    .logo{text-align:center;margin-bottom:28px}
+    .logo h1{color:#25d366;font-size:24px;letter-spacing:-.5px}
+    .logo p{color:#94a3b8;font-size:13px;margin-top:4px}
+    form{display:flex;flex-direction:column;gap:16px}
+    input{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px 16px;color:#f1f5f9;font-size:15px;outline:none;transition:border .2s}
+    input:focus{border-color:#25d366}
+    input::placeholder{color:#64748b}
+    button{background:#25d366;color:#0f172a;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .2s}
+    button:active{transform:scale(.97)}
+    .error{background:rgba(239,68,68,.15);color:#fca5a5;padding:10px 14px;border-radius:10px;font-size:13px;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1>💬 Multi-Bot</h1>
+      <p>WhatsApp Multi-Session Manager</p>
+      <div style="margin-top:8px;font-size:11px;color:#64748b">
+        🤖 AI · 👥 Groups · 📊 Analytics · 🔌 Plugins
+      </div>
+    </div>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="POST">
+      <input type="text" name="user" placeholder="Username" value="admin" required autofocus>
+      <input type="password" name="pass" placeholder="Password" value="admin123" required>
+      <button type="submit">Sign In →</button>
+    </form>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #334155;font-size:11px;color:#64748b;text-align:center">
+      Default: admin / admin123<br>
+      Change these in your .env file
+    </div>
+  </div>
+</body>
+</html>

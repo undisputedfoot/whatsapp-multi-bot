@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Search · WhatsApp Multi-Bot</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,sans-serif}
+    body{background:#0f172a;color:#f1f5f9;min-height:100vh;padding-bottom:80px}
+    header{background:#1e293b;padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50}
+    header h1{font-size:17px;flex:1}
+    .search-box{padding:12px 16px}
+    .search-box input{width:100%;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px 16px;color:#f1f5f9;font-size:15px;outline:none}
+    .search-box input:focus{border-color:#25d366}
+    .results{padding:0 16px}
+    .result-item{background:#1e293b;border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid #334155}
+    .result-item .meta{font-size:11px;color:#64748b;margin-bottom:4px;display:flex;gap:8px}
+    .result-item .body{font-size:14px;line-height:1.4}
+    .result-item .body b{color:#25d366}
+    .empty{text-align:center;padding:40px;color:#64748b;font-size:14px}
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;display:flex;border-top:1px solid #334155;z-index:50}
+    .tab-bar a{flex:1;text-align:center;padding:10px;color:#64748b;text-decoration:none;font-size:11px}
+    .tab-bar a.active{color:#25d366}
+    .tab-bar a span{font-size:20px;display:block;margin-bottom:2px}
+  </style>
+</head>
+<body>
+  <header><h1>🔍 Message Search</h1></header>
+  <div class="search-box">
+    <input type="text" id="search-input" placeholder="Search messages..." onkeydown="if(event.key==='Enter')search()" autofocus>
+  </div>
+  <div class="results" id="results"><div class="empty">Type a query and press Enter</div></div>
+  <nav class="tab-bar">
+    <a href="/"><span>📡</span>Dashboard</a>
+    <a href="/inbox"><span>💬</span>Inbox</a>
+    <a href="/media"><span>📸</span>Media</a>
+    <a href="/groups"><span>👥</span>Groups</a>
+    <a href="/analytics"><span>📊</span>Analytics</a>
+    <a href="/settings"><span>⚙️</span>Settings</a>
+  </nav>
+  <script>
+    let currentSession = 'main';
+    fetch('/api/sessions').then(r=>r.json()).then(sessions => {
+      if (sessions.length) currentSession = sessions[0].name;
+    });
+
+    function highlight(text, query) {
+      const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+      return parts.map(p => p.toLowerCase() === query.toLowerCase() ? `<b>${p}</b>` : p).join('');
+    }
+
+    function search() {
+      const q = document.getElementById('search-input').value.trim();
+      if (!q) return;
+      fetch(`/api/search/${currentSession}?q=${encodeURIComponent(q)}`)
+        .then(r=>r.json()).then(msgs => {
+          const el = document.getElementById('results');
+          if (!msgs.length) {
+            el.innerHTML = '<div class="empty">No messages found</div>';
+            return;
+          }
+          el.innerHTML = msgs.map(m => `
+            <div class="result-item">
+              <div class="meta">
+                <span>${m.direction === 'in' ? '📥' : '📤'}</span>
+                <span>${m.peer || '?'}</span>
+                <span>${(m.created_at||'').slice(11,19)}</span>
+              </div>
+              <div class="body">${highlight(m.body || '', q)}</div>
+            </div>
+          `).join('');
+        });
+    }
+  </script>
+</body>
+</html>

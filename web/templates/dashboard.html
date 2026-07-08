@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WhatsApp Multi-Bot</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    body{background:#0f172a;color:#f1f5f9;min-height:100vh;padding-bottom:80px}
+    
+    /* ── Header ── */
+    header{background:#1e293b;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50}
+    header h1{font-size:18px;display:flex;align-items:center;gap:8px}
+    header h1 span{color:#25d366}
+    header a{color:#94a3b8;text-decoration:none;font-size:14px;padding:8px 12px;border-radius:10px;background:#0f172a;transition:background .2s}
+    header a:active{background:#334155}
+
+    /* ── Stats bar ── */
+    .stats{display:flex;gap:10px;padding:14px 16px;margin:16px;background:#1e293b;border-radius:14px;border:1px solid #334155}
+    .stat{flex:1;text-align:center}
+    .stat .num{font-size:26px;font-weight:700;display:block}
+    .stat .num.green{color:#25d366}
+    .stat .num.red{color:#ef4444}
+    .stat .label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+    /* ── Sessions ── */
+    .section-title{font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;padding:0 16px;margin:20px 0 10px}
+    .session-card{background:#1e293b;margin:8px 16px;padding:16px;border-radius:14px;border:1px solid #334155;display:flex;align-items:center;gap:12px;transition:border-color .2s}
+    .session-card.connected{border-color:#25d36644}
+    .status-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+    .status-dot.on{background:#25d366;box-shadow:0 0 8px #25d36666}
+    .status-dot.off{background:#ef4444;box-shadow:0 0 8px #ef444466}
+    .session-info{flex:1;min-width:0}
+    .session-info .name{font-weight:600;font-size:15px}
+    .session-info .meta{font-size:12px;color:#94a3b8;margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+    .session-info .meta span{background:#0f172a;padding:2px 8px;border-radius:6px}
+    .session-actions{display:flex;gap:6px;flex-shrink:0}
+    .session-actions button{background:#0f172a;border:1px solid #334155;color:#f1f5f9;padding:8px 12px;border-radius:10px;font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .session-actions button:active{transform:scale(.95)}
+    .session-actions button.green{background:#25d36622;border-color:#25d366;color:#25d366}
+
+    /* ── Logs ── */
+    .log-box{background:#0f172a;margin:8px 16px;padding:14px;border-radius:14px;border:1px solid #334155;max-height:300px;overflow-y:auto;font-family:monospace;font-size:12px;line-height:1.6}
+    .log-box .log-entry{color:#94a3b8;border-bottom:1px solid #1e293b;padding:4px 0}
+    .log-box .log-entry .time{color:#64748b;margin-right:8px}
+    .log-box .log-entry .sess{color:#25d366;margin-right:6px}
+
+    /* ── Tabs ── */
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;display:flex;border-top:1px solid #334155;z-index:50}
+    .tab-bar a{flex:1;text-align:center;padding:12px;color:#64748b;text-decoration:none;font-size:12px;transition:color .2s}
+    .tab-bar a.active{color:#25d366}
+    .tab-bar a span{font-size:20px;display:block;margin-bottom:2px}
+
+    /* ── Refresh ── */
+    .refresh-btn{position:fixed;bottom:80px;right:16px;background:#25d366;color:#0f172a;border:none;width:50px;height:50px;border-radius:50%;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s;z-index:40}
+    .refresh-btn:active{transform:scale(.9)}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>💬 <span>Multi-Bot</span></h1>
+    <a href="/settings">⚙️ Settings</a>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat"><span class="num green" id="stat-connected">0</span><span class="label">Connected</span></div>
+    <div class="stat"><span class="num" id="stat-total" style="color:#f1f5f9">0</span><span class="label">Total</span></div>
+    <div class="stat"><span class="num red" id="stat-offline">0</span><span class="label">Offline</span></div>
+  </div>
+
+  <div class="section-title">📡 Sessions</div>
+  <div id="session-list"></div>
+
+  <div class="section-title">📋 Recent Logs</div>
+  <div class="log-box" id="log-box"><div style="color:#64748b;text-align:center">Loading…</div></div>
+
+  <button class="refresh-btn" onclick="refresh()">↻</button>
+
+  <!-- QR Code Modal -->
+  <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px" id="qr-modal" onclick="this.style.display='none'">
+    <div style="background:#1e293b;border-radius:20px;padding:30px;text-align:center;max-width:320px;width:100%" onclick="event.stopPropagation()">
+      <h3 style="margin-bottom:12px">📱 Scan QR Code</h3>
+      <div id="qr-image" style="background:white;border-radius:12px;padding:10px;margin-bottom:12px;min-height:200px;display:flex;align-items:center;justify-content:center">
+        <div style="color:#64748b">Loading...</div>
+      </div>
+      <p style="font-size:13px;color:#94a3b8">Open WhatsApp → Linked Devices → Link a Device</p>
+      <button onclick="document.getElementById('qr-modal').style.display='none'" style="margin-top:12px;background:#334155;border:none;color:#f1f5f9;padding:8px 20px;border-radius:10px;cursor:pointer">Close</button>
+    </div>
+  </div>
+
+  <nav class="tab-bar">
+    <a href="/" class="active"><span>📡</span>Dashboard</a>
+    <a href="/inbox"><span>💬</span>Inbox</a>
+    <a href="/search"><span>🔍</span>Search</a>
+    <a href="/media"><span>📸</span>Media</a>
+    <a href="/groups"><span>👥</span>Groups</a>
+    <a href="/analytics"><span>📊</span>Analytics</a>
+    <a href="/settings"><span>⚙️</span>Settings</a>
+  </nav>
+
+  <script>
+    const socket = io();
+
+    function render(data) {
+      const total = data.sessions.length;
+      const connected = data.sessions.filter(s => s.connected).length;
+      document.getElementById('stat-connected').textContent = connected;
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-offline').textContent = total - connected;
+
+      const list = document.getElementById('session-list');
+      list.innerHTML = data.sessions.map(s => `
+        <div class="session-card ${s.connected ? 'connected' : ''}">
+          <div class="status-dot ${s.connected ? 'on' : 'off'}"></div>
+          <div class="session-info">
+            <div class="name">${s.name}</div>
+            <div class="meta">
+              <span>🌐 ${s.lang}</span>
+              <span>💬 ${s.auto_reply ? 'Auto ON' : 'Auto OFF'}</span>
+              <span>🤖 ${s.ai_reply ? 'AI ON' : 'AI OFF'}</span>
+            </div>
+          </div>
+          <div class="session-actions">
+            ${!s.connected ? `<button onclick="showQR('${s.name}')">📱</button>` : ''}
+            <button onclick="toggleLang('${s.name}')">🌐</button>
+            <button class="${s.auto_reply ? 'green' : ''}" onclick="toggleAuto('${s.name}')">💬</button>
+            <button class="${s.ai_reply ? 'green' : ''}" onclick="toggleAI('${s.name}')">🤖</button>
+            <button onclick="restart('${s.name}')">🔄</button>
+          </div>
+        </div>
+      `).join('');
+      if (!data.sessions.length) {
+        list.innerHTML = '<div style="text-align:center;color:#64748b;padding:40px">No sessions configured. Add SESSION_NAMES to .env</div>';
+      }
+
+      const logBox = document.getElementById('log-box');
+      logBox.innerHTML = (data.logs||[]).slice().reverse().map(l =>
+        `<div class="log-entry"><span class="time">${(l.time||'').slice(11,19)}</span><span class="sess">[${l.session}]</span>${l.msg}</div>`
+      ).join('');
+    }
+
+    function refresh() {
+      fetch('/api/status').then(r => r.json()).then(render).catch(() => {});
+    }
+
+    function showQR(name) {
+      document.getElementById('qr-modal').style.display = 'flex';
+      document.getElementById('qr-image').innerHTML = '<div style="color:#64748b">Loading QR...</div>';
+      fetch('/api/qr/' + name).then(r => r.json()).then(data => {
+        if (data.qr) {
+          document.getElementById('qr-image').innerHTML = `<img src="${data.qr}" style="width:200px;height:200px;border-radius:8px" alt="QR">`;
+        } else {
+          document.getElementById('qr-image').innerHTML = '<div style="color:#64748b">QR not available yet. Session may be connecting...</div>';
+        }
+      }).catch(() => {
+        document.getElementById('qr-image').innerHTML = '<div style="color:#ef4444">Failed to load QR</div>';
+      });
+    }
+
+    function restart(name) {
+      fetch('/api/session/' + name, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'restart'})
+      }).then(refresh);
+    }
+
+    function toggleAuto(name) {
+      fetch('/api/session/' + name, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'toggle_autoreply'})
+      }).then(refresh);
+    }
+
+    function toggleAI(name) {
+      fetch('/api/session/' + name, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'toggle_ai'})
+      }).then(refresh);
+    }
+
+    function toggleLang(name) {
+      const langs = {{ langs|tojson }};
+      const current = prompt(`Language for ${name} (${langs.join(', ')}):`);
+      if (current && langs.includes(current)) {
+        fetch('/api/session/' + name, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: 'set_lang', lang: current})
+        }).then(refresh);
+      }
+    }
+
+    setInterval(refresh, 5000);
+    refresh();
+  </script>
+</body>
+</html>
