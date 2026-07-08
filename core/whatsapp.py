@@ -195,6 +195,7 @@ class WApp:
     def __init__(self, name: str, on_qr=None, on_ready=None, on_msg=None, on_call=None,
                  on_group_event=None):
         self.name = name
+        self._context = None
         self.page: Page | None = None
         self.connected = False
         self._on_qr = on_qr
@@ -207,13 +208,22 @@ class WApp:
         self._last_msg_count = 0
 
     async def start(self):
-        browser = await get_browser()
-        context = await browser.new_context(
-            viewport={"width": 800, "height": 600},
+        # Use persistent context for saved sessions
+        self._context = await _playwright.chromium.launch_persistent_context(
             user_data_dir=str(SESSION_DIR / self.name),
+            headless=True,
+            viewport={"width": 800, "height": 600},
             locale="en-US",
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-accelerated-2d-canvas",
+                "--no-first-run",
+            ],
         )
-        self.page = await context.new_page()
+        self.page = self._context.pages[0] if self._context.pages else await self._context.new_page()
         await self.page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
 
         # Inject the Store hook script
@@ -228,11 +238,16 @@ class WApp:
 
     async def stop(self):
         self._stop = True
-        if self.page:
-            try:
+        try:
+            if self._context:
+                await self._context.close()
+        except Exception:
+            pass
+        try:
+            if self.page:
                 await self.page.close()
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     # ── Auth ──────────────────────────────────
 
