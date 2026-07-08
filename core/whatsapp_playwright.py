@@ -90,12 +90,23 @@ class WApp:
 
     async def start(self):
         p = await async_playwright().start()
-        self._context = await p.chromium.launch_persistent_context(
+        
+        # Find Chromium binary: try system path first, fall back to Playwright's bundled
+        import shutil, os
+        chrome_path = os.environ.get("CHROMIUM_PATH") or shutil.which("chromium") or shutil.which("chromium-browser")
+        launch_opts = dict(
             user_data_dir=str(SESSION_DIR / self.name),
             headless=True, viewport={"width": 800, "height": 600}, locale="en-US",
             args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
                   "--disable-gpu", "--no-first-run"],
         )
+        if chrome_path:
+            launch_opts["executable_path"] = chrome_path
+            print(f"  🌐 Using Chromium: {chrome_path}")
+        else:
+            print("  ⚠️  No Chromium found. Install chromium-browser or set CHROMIUM_PATH")
+        
+        self._context = await p.chromium.launch_persistent_context(**launch_opts)
         self.page = self._context.pages[0] if self._context.pages else await self._context.new_page()
         await self.page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
         await self.page.evaluate(STORE_INJECT_JS)

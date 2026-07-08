@@ -10,9 +10,13 @@ LABEL description="WhatsApp Multi-Bot — Multi-session WhatsApp automation"
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-sandbox \
-    chromium-driver \
+    chromium-chromedriver \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Find where chromium was actually installed
+RUN CHROME=$(which chromium || which chromium-browser || echo /usr/bin/chromium) && \
+    echo "Chromium at: $CHROME"
 
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV BROWSER_MODE=local
