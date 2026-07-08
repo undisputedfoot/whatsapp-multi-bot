@@ -27,6 +27,8 @@ from core.features.persona_manager import PersonaManager
 from core.features.group_games import GroupGames
 from core.features.plugin_loader import PluginLoader
 from core.features.auto_update import AutoUpdater
+from core.features.warn_system import WarnSystem
+from core.features.custom_cmds import CustomCommands
 
 
 class Session:

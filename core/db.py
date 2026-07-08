@@ -97,6 +97,14 @@ def migrate():
             UNIQUE(session, group_id)
         );
 
+        CREATE TABLE IF NOT EXISTS custom_commands (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session     TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            response    TEXT NOT NULL,
+            UNIQUE(session, name)
+        );
+
         CREATE TABLE IF NOT EXISTS group_members (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             session     TEXT NOT NULL,
@@ -585,3 +593,71 @@ def message_stats(session: str, days: int = 7) -> dict:
             (session, f'-{days} days'),
         ).fetchall()
     return {"inbound": inbound, "outbound": outbound, "total": inbound + outbound, "top_contacts": [dict(r) for r in top]}
+
+
+# ── Warn System ───────────────────────────────────────
+
+def _ensure_warns_table():
+    with _conn() as db:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS warns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                target TEXT NOT NULL,
+                group_jid TEXT NOT NULL,
+                count INTEGER DEFAULT 0,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(target, group_jid)
+            )
+        """)
+
+
+def get_warns(target: str, group_jid: str) -> int:
+    _ensure_warns_table()
+    with _conn() as db:
+        row = db.execute(
+            "SELECT count FROM warns WHERE target=? AND group_jid=?", (target, group_jid)
+        ).fetchone()
+    return row["count"] if row else 0
+
+
+def set_warns(target: str, group_jid: str, count: int):
+    _ensure_warns_table()
+    with _conn() as db:
+        db.execute(
+            "INSERT INTO warns (target, group_jid, count) VALUES (?, ?, ?) "
+            "ON CONFLICT(target, group_jid) DO UPDATE SET count=excluded.count, updated_at=CURRENT_TIMESTAMP",
+            (target, group_jid, count),
+        )
+
+
+def clear_warns(target: str, group_jid: str):
+    _ensure_warns_table()
+    with _conn() as db:
+        db.execute("DELETE FROM warns WHERE target=? AND group_jid=?", (target, group_jid))
+
+
+# ── Custom Commands ───────────────────────────────────
+
+def set_custom_command(session: str, name: str, response: str):
+    with _conn() as db:
+        db.execute(
+            "INSERT INTO custom_commands (session, name, response) VALUES (?, ?, ?) "
+            "ON CONFLICT(session, name) DO UPDATE SET response=excluded.response",
+            (session, name, response),
+        )
+
+
+def get_custom_commands(session: str) -> list[dict]:
+    with _conn() as db:
+        rows = db.execute(
+            "SELECT name, response FROM custom_commands WHERE session=? ORDER BY name",
+            (session,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_custom_command(session: str, name: str):
+    with _conn() as db:
+        db.execute(
+            "DELETE FROM custom_commands WHERE session=? AND name=?", (session, name)
+        )
