@@ -1,18 +1,13 @@
-# 🤖 WhatsApp Multi-Bot — Render Blueprint
+# 🤖 WhatsApp Multi-Bot — Render Blueprint (Docker)
 # Deploy: https://render.com/deploy?repo=https://github.com/undisputedfoot/whatsapp-multi-bot
 
 services:
   - type: web
     name: whatsapp-multi-bot
-    runtime: python
+    runtime: docker
     repo: https://github.com/undisputedfoot/whatsapp-multi-bot
     plan: free
     region: oregon
-    buildCommand: |
-      pip install -r requirements.txt
-      python -m playwright install chromium
-      python -m playwright install-deps chromium
-    startCommand: gunicorn -k eventlet -w 1 -b 0.0.0.0:5000 'main:create_app()'
     healthCheckPath: /login
     envVars:
       - key: BOT_LANGUAGE
@@ -20,15 +15,15 @@ services:
       - key: SESSION_NAMES
         value: main
       - key: BROWSER_MODE
-        value: remote
+        value: local
       - key: AI_PROVIDER
-        value: none
+        value: openrouter
       - key: AI_API_KEY
-        value: ""
+        sync: false
       - key: GOOGLE_API_KEY
-        value: ""
+        sync: false
       - key: GROQ_API_KEY
-        value: ""
+        sync: false
       - key: DASHBOARD_USER
         value: admin
       - key: DASHBOARD_PASS

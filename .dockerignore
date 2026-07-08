@@ -1,0 +1,15 @@
+.env
+.git
+.gitignore
+data/
+__pycache__/
+*.pyc
+.DS_Store
+.first_run_done
+README.md
+setup.bat
+setup_termux.sh
+start_bot.bat
+push_to_github.bat
+scripts/
+*.md
