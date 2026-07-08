@@ -55,7 +55,40 @@ class WApp:
         opts.add_argument("--window-size=800,600")
         opts.add_experimental_option("excludeSwitches", ["enable-logging"])
 
-        self.driver = webdriver.Chrome(options=opts)
+        # Try common Chromium binary locations (Termux + desktop)
+        import shutil
+        chrome_paths = [
+            shutil.which("chromium"),
+            shutil.which("chromium-browser"),
+            shutil.which("google-chrome"),
+            shutil.which("chrome"),
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/data/data/com.termux/files/usr/bin/chromium",
+        ]
+        for p in chrome_paths:
+            if p and os.path.exists(p):
+                opts.binary_location = p
+                break
+
+        # Try common chromedriver locations
+        driver_paths = [
+            shutil.which("chromedriver"),
+            "/data/data/com.termux/files/usr/bin/chromedriver",
+            "/usr/bin/chromedriver",
+        ]
+        driver_path = None
+        for p in driver_paths:
+            if p and os.path.exists(p):
+                driver_path = p
+                break
+
+        if driver_path:
+            from selenium.webdriver.chrome.service import Service
+            service = Service(executable_path=driver_path)
+            self.driver = webdriver.Chrome(options=opts, service=service)
+        else:
+            self.driver = webdriver.Chrome(options=opts)
         self.driver.get("https://web.whatsapp.com")
 
         # Start monitoring loops
