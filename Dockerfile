@@ -10,7 +10,6 @@ LABEL description="WhatsApp Multi-Bot — Multi-session WhatsApp automation"
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-driver \
-    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Find chromium binary (path varies across Debian versions)
