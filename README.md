@@ -76,7 +76,7 @@ python -m playwright install chromium && python main.py
 ```bash
 # Install Termux from F-Droid, then:
 pkg install git -y
-git clone https://github.com/YOUR_USER/whatsapp-multi-bot
+git clone https://github.com/undisputedfoot/whatsapp-multi-bot
 cd whatsapp-multi-bot
 bash scripts/termux-setup.sh
 python main.py
