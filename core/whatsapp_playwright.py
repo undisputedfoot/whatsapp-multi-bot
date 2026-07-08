@@ -140,17 +140,24 @@ class WApp:
                 except TimeoutError:
                     pass
 
+                # Log page state for debugging (every 15 seconds)
+                if retries % 8 == 0:
+                    try:
+                        title = await page.title()
+                        url = page.url
+                        print(f"  📄 Page: {title[:60]} | {url[:50]}...")
+                    except Exception:
+                        pass
+
                 # Try to get QR code - multiple methods
                 qr = None
                 try:
-                    # Method 1: Check the injected JS variable
                     qr = await page.evaluate("window.__WA_QR || null")
                 except Exception:
                     pass
                 
                 if not qr:
                     try:
-                        # Method 2: Direct canvas extraction
                         qr = await page.evaluate("""
                             (() => {
                                 const c = document.querySelector('canvas');
@@ -167,12 +174,20 @@ class WApp:
                         if self._on_qr: await self._safe_call(self._on_qr, qr)
                 else:
                     retries += 1
-                    if retries % 10 == 0:  # Log every ~20 seconds
-                        print(f"  ⏳ Waiting for QR code... ({retries * 2}s)")
+                    if retries % 15 == 0:
+                        print(f"  ⏳ Waiting for QR... ({retries * 2}s elapsed)")
+                        # Check if WhatsApp Web loaded or showing something else
+                        try:
+                            body_text = await page.evaluate("document.body?.innerText?.substring(0, 200) || 'empty'")
+                            if "download" in body_text.lower() or "update" in body_text.lower():
+                                print(f"  ⚠️  WhatsApp might be showing a different page:")
+                                print(f"  {body_text[:100]}")
+                        except Exception:
+                            pass
             except Exception as e:
                 retries += 1
                 if retries % 10 == 0:
-                    print(f"  ⚠️  Auth check error: {e}")
+                    print(f"  ⚠️  Auth error: {e}")
             await asyncio.sleep(2)
 
     async def _message_poll(self):
