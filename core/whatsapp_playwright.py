@@ -124,32 +124,55 @@ class WApp:
 
     async def _auth_loop(self):
         page = self.page
+        retries = 0
         while not self._stop:
             try:
+                # Check if already logged in
                 try:
-                    await page.wait_for_selector("div[data-testid='chat-list']", timeout=3)
+                    await page.wait_for_selector("div[data-testid='chat-list']", timeout=5)
                     if not self.connected:
                         self.connected = True
+                        print("  ✅ WhatsApp Web authenticated!")
                         await page.evaluate(STORE_INJECT_JS)
                         if self._on_ready: await self._safe_call(self._on_ready)
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(5)
                     continue
                 except TimeoutError:
                     pass
-                qr = await page.evaluate("window.__WA_QR || null")
-                if qr and not self._qr_sent:
-                    self._qr_sent = True
-                    if self._on_qr: await self._safe_call(self._on_qr, qr)
-                elif qr and self._qr_sent:
+
+                # Try to get QR code - multiple methods
+                qr = None
+                try:
+                    # Method 1: Check the injected JS variable
+                    qr = await page.evaluate("window.__WA_QR || null")
+                except Exception:
+                    pass
+                
+                if not qr:
                     try:
-                        await page.wait_for_selector("div[data-testid='chat-list']", timeout=1)
-                        self.connected = True
-                        await page.evaluate(STORE_INJECT_JS)
-                        if self._on_ready: await self._safe_call(self._on_ready)
-                    except TimeoutError:
+                        # Method 2: Direct canvas extraction
+                        qr = await page.evaluate("""
+                            (() => {
+                                const c = document.querySelector('canvas');
+                                return c && c.toDataURL ? c.toDataURL() : null;
+                            })()
+                        """)
+                    except Exception:
                         pass
-            except Exception:
-                pass
+
+                if qr:
+                    if not self._qr_sent:
+                        self._qr_sent = True
+                        print("  📱 QR code available - scan with WhatsApp!")
+                        if self._on_qr: await self._safe_call(self._on_qr, qr)
+                else:
+                    retries += 1
+                    if retries % 10 == 0:  # Log every ~20 seconds
+                        print(f"  ⏳ Waiting for QR code... ({retries * 2}s)")
+            except Exception as e:
+                retries += 1
+                if retries % 10 == 0:
+                    print(f"  ⚠️  Auth check error: {e}")
             await asyncio.sleep(2)
 
     async def _message_poll(self):
