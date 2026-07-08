@@ -53,8 +53,7 @@ fi
 
 # 5. Install Python packages
 echo -e "${YELLOW}[5/6] Installing Python packages...${NC}"
-pip install --upgrade pip -q
-pip install -r requirements.txt -q
+pip install -r requirements.txt
 echo -e "${GREEN}✅ Python packages installed${NC}"
 
 # 6. Setup .env
