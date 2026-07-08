@@ -1,53 +1,56 @@
 """
 WhatsApp Web engine - auto-selects HTTP (Baileys), Playwright, or Selenium.
+
+Engine is chosen lazily when WApp() is first constructed, not at import time.
+Override with WA_ENGINE env var: http, playwright, selenium, auto
 """
 
 import sys
 import platform
 import os
+import importlib
 
 
-# ── Auto-detect best engine ──────────────────
-# Prefer HTTP engine (whatsapp-web.js) if available
-_HAS_HTTP = False
-try:
-    import httpx
-    _HAS_HTTP = True
-except ImportError:
-    pass
+def WApp(*args, **kwargs):
+    """Factory that selects the best available engine at call time."""
+    engine = os.environ.get("WA_ENGINE", "auto").lower()
+    is_arm = platform.machine() in ("aarch64", "armv8l", "arm")
+    is_termux = "com.termux" in (sys.executable or "")
 
-_HAS_PLAYWRIGHT = False
-try:
-    import playwright  # noqa
-    _HAS_PLAYWRIGHT = True
-except ImportError:
-    pass
+    # Check what's available
+    has_httpx = False
+    has_playwright = False
+    try:
+        import httpx  # noqa
+        has_httpx = True
+    except ImportError:
+        pass
+    try:
+        import playwright  # noqa
+        has_playwright = True
+    except ImportError:
+        pass
+    if is_arm or is_termux:
+        has_playwright = False
 
-# On Termux / ARM, force Selenium
-_IS_ARM = platform.machine() in ("aarch64", "armv8l", "arm")
-_IS_TERMUX = "com.termux" in (sys.executable or "")
+    # Select engine
+    mod_name = None
+    label = ""
 
-if _IS_ARM or _IS_TERMUX:
-    _HAS_PLAYWRIGHT = False
+    if engine == "http" or (engine == "auto" and has_httpx and not is_arm and not is_termux):
+        mod_name = ".whatsapp_http"
+        label = "HTTP (whatsapp-web.js via Baileys)"
+    elif engine == "playwright" or (engine == "auto" and has_playwright):
+        mod_name = ".whatsapp_playwright"
+        label = "Playwright (desktop browser)"
+    else:
+        mod_name = ".whatsapp_selenium"
+        label = "Selenium (mobile/Termux)"
 
-# Engine override via env
-_ENGINE = os.environ.get("WA_ENGINE", "auto").lower()
-
-
-# ── Import the right engine ──────────────────
-if _ENGINE == "http" or (_ENGINE == "auto" and _HAS_HTTP and not _IS_ARM):
-    from .whatsapp_http import WApp
-    print("  🌐 Using HTTP engine (whatsapp-web.js via Baileys)")
-elif _HAS_PLAYWRIGHT:
-    from .whatsapp_playwright import WApp
-    print("  🖥️  Using Playwright engine (desktop)")
-else:
-    from .whatsapp_selenium import WApp
-    print("  📱 Using Selenium engine (mobile/Termux)")
-    print("  📱  Using Selenium engine (ARM/Termux)")
-
-    async def get_qr_data(self) -> str | None:
-        """Get current QR code as data URL."""
+    mod = importlib.import_module(mod_name, __package__)
+    cls = getattr(mod, "WApp")
+    print(f"  🚀 Engine: {label}")
+    return cls(*args, **kwargs)
         try:
             return await self.page.evaluate("window.__WA_QR || null")
         except Exception:

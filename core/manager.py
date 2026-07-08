@@ -38,7 +38,7 @@ class Session:
         self.lang = sess_db.get("language", "en") if sess_db else "en"
         self.auto_reply_on = AUTO_REPLY_ON
         self.ai_reply_on = bool(sess_db.get("ai_reply", 0)) if sess_db else False
-        self.wapp: WApp | None = None
+        self.wapp = None  # Will be set to a WApp instance
         self._on_log = on_log or (lambda *a: None)
         self._manager = manager_ref
         self.features = {
@@ -103,7 +103,17 @@ class Session:
             return
 
         # ── AI reply (takes priority) ──
-        if self.ai_reply_on and AI_API_KEY:
+        _has_ai_key = bool(AI_API_KEY)
+        if AI_PROVIDER == "groq":
+            from .config import GROQ_API_KEY as _k
+            _has_ai_key = bool(_k)
+        elif AI_PROVIDER == "nvidia":
+            from .config import NVIDIA_API_KEY as _k
+            _has_ai_key = bool(_k)
+        elif AI_PROVIDER == "gemini":
+            from .config import GOOGLE_API_KEY as _k
+            _has_ai_key = bool(_k)
+        if self.ai_reply_on and _has_ai_key:
             replied = await self.features["ai_reply"].handle(body, sender, self.wapp, self.lang)
             if replied:
                 return
@@ -184,8 +194,19 @@ class Session:
                 await self.wapp.send_text(sender, f"Auto-reply: {st}")
 
         elif cmd == "!ai":
-            if AI_PROVIDER == "none" or not AI_API_KEY:
-                await self.wapp.send_text(sender, "❌ AI not configured. Set AI_API_KEY in .env")
+            # Check if the current provider's API key is configured
+            provider_key = AI_API_KEY
+            if AI_PROVIDER == "groq":
+                from .config import GROQ_API_KEY
+                provider_key = GROQ_API_KEY
+            elif AI_PROVIDER == "nvidia":
+                from .config import NVIDIA_API_KEY
+                provider_key = NVIDIA_API_KEY
+            elif AI_PROVIDER == "gemini":
+                from .config import GOOGLE_API_KEY
+                provider_key = GOOGLE_API_KEY
+            if AI_PROVIDER == "none" or not provider_key:
+                await self.wapp.send_text(sender, f"❌ {AI_PROVIDER} not configured. Set the API key in .env")
                 return
             sub = parts[1] if len(parts) > 1 else ""
             if sub == "on":
