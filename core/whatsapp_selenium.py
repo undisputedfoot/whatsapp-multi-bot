@@ -47,31 +47,40 @@ class WApp:
 
         opts = Options()
         opts.add_argument(f"--user-data-dir={user_dir}")
-        opts.add_argument("--headless")
+
+        # Termux/Android headless flags
+        opts.add_argument("--headless=new")
         opts.add_argument("--no-sandbox")
         opts.add_argument("--disable-setuid-sandbox")
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-gpu")
+        opts.add_argument("--disable-software-rasterizer")
+        opts.add_argument("--disable-features=VizDisplayCompositor")
         opts.add_argument("--window-size=800,600")
-        opts.add_experimental_option("excludeSwitches", ["enable-logging"])
+        opts.add_argument("--remote-debugging-port=0")
+        opts.add_argument("--disable-extensions")
+        opts.add_argument("--disable-sync")
+        opts.add_argument("--single-process")
+        opts.add_argument("--no-zygote")
+        opts.add_experimental_option("excludeSwitches", ["enable-logging", "enable-automation"])
 
-        # Try common Chromium binary locations (Termux + desktop)
+        # Find Chromium and chromedriver binaries
         import shutil
         chrome_paths = [
             shutil.which("chromium"),
             shutil.which("chromium-browser"),
             shutil.which("google-chrome"),
+            shutil.which("google-chrome-stable"),
             shutil.which("chrome"),
+            "/data/data/com.termux/files/usr/bin/chromium",
             "/usr/bin/chromium",
             "/usr/bin/chromium-browser",
-            "/data/data/com.termux/files/usr/bin/chromium",
         ]
         for p in chrome_paths:
             if p and os.path.exists(p):
                 opts.binary_location = p
                 break
 
-        # Try common chromedriver locations
         driver_paths = [
             shutil.which("chromedriver"),
             "/data/data/com.termux/files/usr/bin/chromedriver",
@@ -83,12 +92,22 @@ class WApp:
                 driver_path = p
                 break
 
+        # Set mobile user agent so WhatsApp Web doesn't block mobile browsers
+        opts.add_argument(
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/120.0.0.0 Safari/537.36'
+        )
+
         if driver_path:
             from selenium.webdriver.chrome.service import Service
             service = Service(executable_path=driver_path)
+            # Increase timeout for slow Termux startup
+            service.start_timeout = 60
             self.driver = webdriver.Chrome(options=opts, service=service)
         else:
             self.driver = webdriver.Chrome(options=opts)
+        self.driver.set_page_load_timeout(60)
         self.driver.get("https://web.whatsapp.com")
 
         # Start monitoring loops
