@@ -22,24 +22,22 @@ echo -e "${YELLOW}[1/6] Updating packages...${NC}"
 pkg update -y && pkg upgrade -y
 
 # 2. Install Python and tools
-echo -e "${YELLOW}[2/6] Installing Python...${NC}"
+echo -e "${YELLOW}[2/6] Installing Python & repos...${NC}"
+pkg install -y x11-repo tur-repo
 pkg install -y python python-pip git
 
-# 3. Install Chromium (via tur-repo for Termux)
+# 3. Install Chromium browser
 echo -e "${YELLOW}[3/6] Installing Chromium browser...${NC}"
-pkg install -y tur-repo 2>/dev/null || true
-if pkg install -y chromium 2>/dev/null; then
-    echo -e "${GREEN}✅ Chromium installed from tur-repo${NC}"
-else
-    echo -e "${YELLOW}⚠️  Trying alternative browser method...${NC}"
-    pip install playwright -q
-    python -m playwright install chromium 2>/dev/null && {
-        echo -e "${GREEN}✅ Chromium installed via Playwright${NC}"
-    } || {
-        echo -e "${RED}❌ Could not install Chromium automatically.${NC}"
-        echo -e "${YELLOW}   Install manually later: pkg install tur-repo && pkg install chromium${NC}"
-    }
-fi
+pkg install -y chromium 2>/dev/null && {
+    echo -e "${GREEN}✅ Chromium installed${NC}"
+    # Install selenium instead of playwright (playwright has no ARM wheels)
+    pip install selenium -q
+    echo -e "${GREEN}✅ Selenium installed (ARM-compatible)${NC}"
+} || {
+    echo -e "${RED}❌ Could not install Chromium.${NC}"
+    echo -e "${YELLOW}   Run: pkg install x11-repo tur-repo && pkg install chromium${NC}"
+    exit 1
+}
 
 # 4. Clone repo
 REPO_DIR="$HOME/whatsapp-multi-bot"

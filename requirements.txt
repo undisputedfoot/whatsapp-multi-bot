@@ -6,8 +6,10 @@ python-dotenv==1.0.1
 gunicorn==23.0.0
 eventlet==0.36.1
 
-# WhatsApp automation
+# WhatsApp automation (desktop)
 playwright==1.48.0
+# WhatsApp automation (Termux/ARM fallback)
+selenium==4.27.0
 
 # Image processing (stickers)
 Pillow==11.0.0
