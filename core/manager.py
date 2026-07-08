@@ -10,7 +10,7 @@ from datetime import datetime
 from .whatsapp import WApp
 from .config import (SESSION_NAMES, AUTO_REPLY_ON, AUTO_STATUS_VIEW,
                      READ_RECEIPTS, AUTO_REJECT_CALLS, STICKER_MAKER,
-                     CALL_REJECT_MSG, AI_PROVIDER, AI_API_KEY)
+                     CALL_REJECT_MSG, AI_PROVIDER, AI_API_KEY, ADMIN_NUMBERS)
 from .lang import t, supported_langs
 from . import db
 
@@ -29,6 +29,7 @@ from core.features.plugin_loader import PluginLoader
 from core.features.auto_update import AutoUpdater
 from core.features.warn_system import WarnSystem
 from core.features.custom_cmds import CustomCommands
+from core.features.anti_delete import AntiDelete
 
 
 class Session:
@@ -57,6 +58,9 @@ class Session:
             "games": GroupGames(on_log),
             "plugins": PluginLoader(on_log),
             "updater": AutoUpdater(on_log),
+            "warn_system": WarnSystem(on_log),
+            "custom_cmds": CustomCommands(on_log),
+            "anti_delete": AntiDelete(on_log),
         }
 
     def log(self, msg: str):
@@ -94,15 +98,33 @@ class Session:
         db.save_message(self.name, sender, "in", body, msg_id)
         db.upsert_chat(self.name, sender, last_msg=body[:80])
 
+        # ── Anti-words check (group bad word filter) ──
+        if ("@g.us" in sender or "-" in sender) and body:
+            from plugins import antiwords
+            blocked = await antiwords.check_message(body, sender, self.wapp, self.lang)
+            if blocked:
+                return
+
         # ── Group-specific processing (anti-link, member tracking) ──
         handled = await self.features["group_manager"].handle_message(msg, body, sender)
         if handled:
             return
 
+        # ── Anti-delete tracking ──
+        admin_num = ADMIN_NUMBERS[0] if ADMIN_NUMBERS else ""
+        await self.features["anti_delete"].handle(msg, self.wapp, self.name, admin_num)
+
         # ── Commands ──
         if body.startswith("!"):
             await self._handle_cmd(body, sender)
             return
+
+        # ── PDM check (block PMs from non-members) ──
+        if "@g.us" not in sender and "-" not in sender:
+            from plugins import pdm
+            blocked = await pdm.check_pm(sender, self.name, self.wapp)
+            if blocked:
+                return
 
         # ── AI reply (takes priority) ──
         _has_ai_key = bool(AI_API_KEY)
@@ -145,11 +167,23 @@ class Session:
         """Called when a member joins or leaves a group."""
         await self.features["group_manager"].handle_group_event(evt)
 
+        # AntiFake check for new joiners
+        if evt.get("type") == "join" and evt.get("peer"):
+            from plugins import antifake
+            await antifake.check_participant(
+                evt["peer"], self.name, evt.get("groupId", ""), self.wapp
+            )
+
     # ── Commands ─────────────────────────────
 
     async def _handle_cmd(self, body: str, sender: str):
         parts = body.lower().split()
         cmd = parts[0]
+
+        # ── Tog check: skip if command is toggled off ──
+        from plugins import tog as tog_plugin
+        if not tog_plugin.is_command_enabled(self.name, cmd):
+            return
 
         # ── Group/admin commands ──
         handled = await self.features["group_manager"].handle_command(cmd, parts, body, sender)
@@ -278,8 +312,100 @@ class Session:
             text = "📡 *Sessions*\n" + "\n".join(lines) if lines else t(self.lang, "no_sessions")
             await self.wapp.send_text(sender, text)
 
+        # ── Levanter: AntiWord (bad word filter) ──
+        elif cmd == "!antiword":
+            from plugins import antiwords
+            handled = await antiwords.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: AntiFake (block numbers by country code) ──
+        elif cmd == "!antifake":
+            from plugins import antifake
+            handled = await antifake.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: ISON (check if number is on WhatsApp) ──
+        elif cmd == "!ison":
+            from plugins import ison
+            handled = await ison.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: MSGS (group message stats) ──
+        elif cmd == "!msgs":
+            from plugins import msgs_stats
+            handled = await msgs_stats.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: PDM (private message mode) ──
+        elif cmd == "!pdm":
+            from plugins import pdm
+            handled = await pdm.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: TOG (toggle commands on/off) ──
+        elif cmd == "!tog":
+            from plugins import tog
+            handled = await tog.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Levanter: VARS (variable storage) ──
+        elif cmd in ("!getvar", "!setvar", "!delvar", "!listvars"):
+            from plugins import vars as vars_plugin
+            handled = await vars_plugin.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Custom commands (setcmd/delcmd/listcmds) ──
+        elif cmd in ("!setcmd", "!delcmd", "!listcmds"):
+            handled = await self.features["custom_cmds"].handle_command(
+                cmd, parts, body, sender, self.wapp, self.lang, self.name
+            )
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Warn system (warn/warnreset/warns) ──
+        elif cmd in ("!warn", "!warnreset", "!warns"):
+            handled = await self.features["warn_system"].handle_command(
+                cmd, parts, body, sender, self.wapp, self.lang, self.name
+            )
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Plugin: tagall (mention all group members) ──
+        elif cmd == "!tagall":
+            from plugins import tagall
+            handled = await tagall.handle_command(cmd, parts, body, sender, self.wapp, self.lang, self.name)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Plugin: weather (get weather for a city) ──
+        elif cmd == "!weather":
+            from plugins import weather
+            handled = await weather.handle_command(cmd, parts, body, sender, self.wapp, self.lang)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Plugin downloader (yt/yta/tiktok/instagram) ──
+        elif cmd in ("!yt", "!yta", "!tiktok", "!instagram"):
+            from plugins import downloader
+            handled = await downloader.handle_command(cmd, parts, body, sender, self.wapp, self.lang)
+            if not handled:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
+
+        # ── Custom command lookup (user-defined !commands) ──
         else:
-            await self.wapp.send_text(sender, t(self.lang, "not_found"))
+            # Check if it's a stored custom command
+            response = self.features["custom_cmds"].get_response(self.name, cmd)
+            if response:
+                await self.wapp.send_text(sender, response)
+            else:
+                await self.wapp.send_text(sender, t(self.lang, "not_found"))
 
     async def _handle_persona(self, parts: list, body: str, sender: str):
         """Switch or list AI personas."""

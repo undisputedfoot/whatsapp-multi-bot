@@ -11,7 +11,7 @@
   <h1>🤖 WhatsApp Multi-Bot</h1>
   <p><strong>Multi-account WhatsApp manager · AI-powered · Web dashboard · 8 languages</strong></p>
   <p>Run multiple WhatsApp accounts from one place. Read messages, send replies, automate everything from a beautiful mobile web dashboard. AI smart replies, group management, scheduled messages, and more — all <strong>free & open source</strong>.</p>
-  <p>⚡ <strong>30+ features</strong> · ☁️ <strong>Deploy to Render in 1 click</strong></p>
+  <p>⚡ <strong>40+ features</strong> · ☁️ <strong>Deploy to Render in 1 click</strong></p>
 </div>
 
 ---
@@ -62,6 +62,18 @@ python -m playwright install chromium && python main.py
 | **🎮 Group Games** | `!trivia`, `!wyr`, `!poll` — interactive group fun |
 | **🔄 Auto-Update** | `!update` command — git pulls + reinstalls + restarts |
 | **🌤️ Weather Plugin** | Built-in example: `!weather London` |
+| **📢 Tag All** | `!tagall` — mention all group members in one message |
+| **⚠️ Warn System** | `!warn`, `!warns`, `!warnreset` — group moderation with kick thresholds |
+| **⌨️ Custom Commands** | `!setcmd`, `!delcmd`, `!listcmds` — user-defined bot responses |
+| **🗑️ Anti-Delete** | Detect deleted messages and forward to admin |
+| **📥 Media Downloader** | `!yt`, `!yta`, `!tiktok`, `!instagram` — download media from popular platforms |
+| **🔞 AntiWords** | `!antiword` — bad word filter with warn/kick actions (like Levanter) |
+| **🚫 AntiFake** | `!antifake` — block numbers from specific country codes (like Levanter) |
+| **🔍 ISON** | `!ison <number>` — check if a phone number is on WhatsApp (like Levanter) |
+| **📊 MSGS** | `!msgs` — group message stats per user (like Levanter) |
+| **📩 PM Mode** | `!pdm on/off` — restrict PMs to group members only (like Levanter) |
+| **🔘 Toggle** | `!tog <cmd> on/off` — enable/disable commands (like Levanter) |
+| **📋 Variables** | `!setvar`, `!getvar`, `!delvar`, `!listvars` — per-session storage (like Levanter) |
 | **Auto-Reply** | Keyword matching per language |
 | **🌐 8 Languages** | EN · ES · HI · AR · FR · PT · DE · JA |
 | **📊 Analytics** | Message stats, doughnut chart, top contacts chart |

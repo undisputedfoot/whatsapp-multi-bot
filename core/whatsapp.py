@@ -51,31 +51,3 @@ def WApp(*args, **kwargs):
     cls = getattr(mod, "WApp")
     print(f"  🚀 Engine: {label}")
     return cls(*args, **kwargs)
-        try:
-            return await self.page.evaluate("window.__WA_QR || null")
-        except Exception:
-            return None
-
-    async def get_chat_list(self) -> list[dict]:
-        """Get recent chats from the sidebar."""
-        chats = []
-        try:
-            items = self.page.locator("div[data-testid='chat-list'] > div")
-            count = await items.count()
-            for i in range(min(count, 50)):
-                name_el = items.nth(i).locator("span[dir='auto']").first
-                name = await name_el.text_content() if await name_el.count() else "?"
-                chats.append({"name": name or "?", "index": i})
-            return chats
-        except Exception:
-            return chats
-
-    @staticmethod
-    async def _safe_call(fn, *args):
-        try:
-            if asyncio.iscoroutinefunction(fn):
-                await fn(*args)
-            else:
-                fn(*args)
-        except Exception:
-            pass

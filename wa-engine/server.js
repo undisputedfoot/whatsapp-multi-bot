@@ -250,7 +250,7 @@ app.get('/poll/:name', (req, res) => {
 
 // Send message
 app.post('/send', async (req, res) => {
-  const { name, to, text } = req.body;
+  const { name, to, text, mentions } = req.body;
   if (!name || !to || !text) return res.status(400).json({ error: 'Missing fields' });
 
   const session = sessions[name];
@@ -260,7 +260,11 @@ app.post('/send', async (req, res) => {
 
   try {
     const chatId = to.includes('@') ? to : `${to}@c.us`;
-    const response = await session.client.sendMessage(chatId, text);
+    const opts = {};
+    if (mentions && Array.isArray(mentions) && mentions.length > 0) {
+      opts.mentions = mentions.map(m => m.includes('@') ? m : `${m}@c.us`);
+    }
+    const response = await session.client.sendMessage(chatId, text, opts);
     res.json({ success: true, id: response.id._serialized });
   } catch(e) {
     res.status(500).json({ error: e.message });

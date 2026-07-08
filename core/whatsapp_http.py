@@ -127,14 +127,17 @@ class WApp:
 
     # ── Actions ───────────────────────────────────────
 
-    async def send_text(self, to: str, text: str) -> bool:
-        """Send a text message via the Node.js engine."""
+    async def send_text(self, to: str, text: str, mentions: list = None) -> bool:
+        """Send a text message via the Node.js engine. Optionally mention users."""
         try:
-            r = self._http.post(f"{WA_ENGINE_URL}/send", json={
+            payload = {
                 "name": self.name,
                 "to": to,
                 "text": text,
-            }, timeout=15)
+            }
+            if mentions:
+                payload["mentions"] = mentions
+            r = self._http.post(f"{WA_ENGINE_URL}/send", json=payload, timeout=15)
             data = r.json()
             return data.get("success", False)
         except Exception as e:
