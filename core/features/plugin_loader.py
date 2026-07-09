@@ -20,6 +20,7 @@ class PluginLoader:
     def __init__(self, on_log=None):
         self._log = on_log or (lambda *a: None)
         self._loaded = {}  # {name: module}
+        self._commands = {}  # {command: description}
 
     def discover(self) -> list[dict]:
         """Return metadata about all available plugins."""
@@ -48,10 +49,13 @@ class PluginLoader:
         """Load all plugin modules and call their register() function."""
         if not PLUGINS_ENABLED:
             return
+        print(f"  [PLUGIN] Loading plugins from {PLUGIN_DIR}...")
         sys.path.insert(0, str(PLUGIN_DIR.parent))
+        count = 0
         for f in sorted(PLUGIN_DIR.glob("*.py")):
             if f.name == "__init__.py":
                 continue
+            count += 1
             try:
                 mod_name = f"plugins.{f.stem}"
                 if mod_name in sys.modules:
@@ -63,11 +67,12 @@ class PluginLoader:
                     mod.register(session_ref)
                     self._loaded[f.stem] = mod
                     db.register_plugin(f.stem)
-                    self._log("plugin", f"🔌 Loaded plugin: {f.stem}")
+                    self._log("plugin", f"[OK] Loaded plugin: {f.stem}")
                 else:
-                    self._log("plugin", f"⚠️ Plugin {f.stem} has no register() function")
+                    self._log("plugin", f"[WARN] Plugin {f.stem} has no register() function")
             except Exception as e:
-                self._log("plugin", f"❌ Plugin {f.stem} error: {e}")
+                self._log("plugin", f"[FAIL] Plugin {f.stem} error: {e}")
+        self._log("plugin", f"[DONE] Loaded {len(self._loaded)}/{count} plugins")
 
     def get_help_text(self) -> str:
         """Collect help text from loaded plugins that have a help_text attribute."""
@@ -86,3 +91,7 @@ class PluginLoader:
             if fn and callable(fn):
                 cmds.extend(fn())
         return cmds
+
+    def register_command(self, command: str, description: str = ""):
+        """Allow plugins to register their commands."""
+        self._commands[command] = description

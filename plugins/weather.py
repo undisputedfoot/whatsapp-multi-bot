@@ -15,7 +15,7 @@ def register(session_ref):
     """Called by the plugin loader. session_ref is the Session instance."""
     global _bot
     _bot = session_ref
-    print(f"  🌤️  Weather plugin loaded for {session_ref.name}")
+    print(f"  Weather plugin loaded for {session_ref.name}")
 
 
 def commands():

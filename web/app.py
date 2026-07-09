@@ -133,7 +133,21 @@ def api_status():
 @app.route("/api/sessions")
 @login_required
 def api_sessions():
-    return jsonify(manager.status_summary())
+    summary = manager.status_summary()
+    # Direct engine check for accurate connected status
+    try:
+        import httpx
+        r = httpx.get("http://127.0.0.1:5001/status", timeout=3)
+        engine_status = r.json()
+        print(f"  [API] Engine status: {engine_status}")
+        for s in summary:
+            en = engine_status.get(s["name"], {})
+            print(f"  [API] Session {s['name']}: engine_ready={en.get('ready')}, current={s['connected']}")
+            if en.get("ready", False):
+                s["connected"] = True
+    except Exception as e:
+        print(f"  [API] Engine check failed: {e}")
+    return jsonify(summary)
 
 
 # ── API: QR Code ─────────────────────────────────────

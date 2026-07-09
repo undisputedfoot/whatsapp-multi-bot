@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 
 from .whatsapp import WApp
+from .whatsapp_http import WA_ENGINE_URL
 from .config import (SESSION_NAMES, AUTO_REPLY_ON, AUTO_STATUS_VIEW,
                      READ_RECEIPTS, AUTO_REJECT_CALLS, STICKER_MAKER,
                      CALL_REJECT_MSG, AI_PROVIDER, AI_API_KEY, ADMIN_NUMBERS)
@@ -565,16 +566,30 @@ class Manager:
         return self.sessions.get(name)
 
     def status_summary(self) -> list[dict]:
-        return [
-            {
+        result = []
+        for s in self.sessions.values():
+            connected = False
+            if s.wapp:
+                connected = s.wapp.connected
+                # Double-check with engine directly
+                if not connected and hasattr(s.wapp, '_http'):
+                    try:
+                        import httpx
+                        r = httpx.get(f"{WA_ENGINE_URL}/status", timeout=3)
+                        st = r.json().get(s.name, {})
+                        if st.get("ready", False):
+                            connected = True
+                            s.wapp.connected = True
+                    except Exception:
+                        pass
+            result.append({
                 "name": s.name,
-                "connected": s.wapp.connected if s.wapp else False,
+                "connected": connected,
                 "lang": s.lang,
                 "auto_reply": s.auto_reply_on,
                 "ai_reply": s.ai_reply_on,
-            }
-            for s in self.sessions.values()
-        ]
+            })
+        return result
 
 
 manager = Manager()
