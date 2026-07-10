@@ -67,12 +67,16 @@ function createClient(name) {
     }),
     puppeteer: {
       headless: true,
+      executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--no-first-run',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-background-networking',
       ],
     },
   });

@@ -17,19 +17,34 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-driver \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV BROWSER_MODE=local
 ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # ── Working directory ───────────────────────────────────
 WORKDIR /app
 
 # ── Copy WA engine (Node.js) ──────────────────────────
 COPY wa-engine/ ./wa-engine/
-RUN cd wa-engine && npm install --production
+RUN cd wa-engine && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install --production
 
 # ── Install Python deps ────────────────────────────────
 COPY requirements.txt .
