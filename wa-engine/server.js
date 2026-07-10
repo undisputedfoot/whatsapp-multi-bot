@@ -66,7 +66,7 @@ function createClient(name) {
       dataPath: path.join(SESSIONS_DIR, name),
     }),
     puppeteer: {
-      headless: true,
+      headless: 'new',
       executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
       args: [
         '--no-sandbox',
@@ -77,7 +77,24 @@ function createClient(name) {
         '--single-process',
         '--disable-extensions',
         '--disable-background-networking',
+        '--disable-software-rasterizer',
+        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+        '--disable-ipc-flooding-protection',
+        '--memory-pressure-off',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-hang-monitor',
+        '--disable-sync',
+        '--disable-default-apps',
+        '--disable-component-update',
+        '--disable-domain-reliability',
+        '--disable-breakpad',
+        '--disable-client-side-phishing-detection',
+        '--no-zygote',
+        '--window-size=360,640',
+        '--max_old_space_size=128',
       ],
+      defaultViewport: { width: 360, height: 640 },
     },
   });
 
