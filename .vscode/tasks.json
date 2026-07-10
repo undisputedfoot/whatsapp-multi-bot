@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "git-push",
+			"type": "shell",
+			"command": "\"C:\\Program Files\\Git\\bin\\git.exe\" -C \"c:\\Users\\Cynthia\\OneDrive\\Desktop\\New folder\\whatsapp-multi-bot\" add . && \"C:\\Program Files\\Git\\bin\\git.exe\" -C \"c:\\Users\\Cynthia\\OneDrive\\Desktop\\New folder\\whatsapp-multi-bot\" commit -m \"fix: PluginLoader, weather emoji, status API, whatsapp syntax\" && \"C:\\Program Files\\Git\\bin\\git.exe\" -C \"c:\\Users\\Cynthia\\OneDrive\\Desktop\\New folder\\whatsapp-multi-bot\" push",
+			"isBackground": false
+		}
+	]
+}
