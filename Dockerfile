@@ -44,5 +44,5 @@ RUN mkdir -p data/sessions data/stickers data/media
 # ── Port ────────────────────────────────────────────────
 EXPOSE 5000
 
-# ── Start (gunicorn) ───────────────────────────────────
-CMD ["gunicorn", "-k", "eventlet", "-w", "1", "-b", "0.0.0.0:5000", "main:create_app()"]
+# ── Start (gunicorn with threads, not eventlet) ───────────────────
+CMD ["gunicorn", "--worker-class", "gthread", "--threads", "4", "-w", "1", "-b", "0.0.0.0:5000", "main:create_app()"]
